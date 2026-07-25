@@ -2,6 +2,11 @@
 
 Các quy tắc bắt buộc áp dụng cho mọi Đặc vụ AI (AI Agents/Antigravity) hoạt động trong workspace này nhằm đảm bảo tính toàn vẹn hệ thống và tối ưu hóa tài nguyên.
 
+> **Quy tắc chung bắt buộc:** Trước mọi task, đọc
+> [`../AGENTS.md`](../AGENTS.md). File tại root là nguồn chuẩn cho phối hợp giữa
+> Codex, Antigravity 2 và các agent khác, đặc biệt về quyền sở hữu file và Git.
+> File này chỉ bổ sung quy trình vận hành riêng của Antigravity.
+
 ---
 
 ## PHẦN A: QUẢN LÝ PHIÊN LÀM VIỆC & PHỐI HỢP ĐẶC VỤ (COORDINATOR RULES)

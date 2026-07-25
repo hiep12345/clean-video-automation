@@ -28,4 +28,5 @@ git submodule update --init content-planner-kb
 
 - Mọi thay đổi code hoặc logic đều phải tạo nhánh mới (Feature Branch).
 - Việc quản lý Task phải thông qua SQLite (`.agents/state/task_agent.db`), tuyệt đối không tạo file `task.md` ở thư mục gốc.
-- Đảm bảo tuân thủ nghiêm ngặt các điều khoản trong `.agents/AGENTS.md`.
+- Mọi AI agent phải đọc `AGENTS.md` ở thư mục gốc trước khi ghi file hoặc thay đổi Git.
+- Antigravity 2 phải đọc thêm `.agents/AGENTS.md` cho các quy trình vận hành chuyên biệt.
