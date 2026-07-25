@@ -1,0 +1,3 @@
+[submodule "flowkit-engine"]
+	path = flowkit-engine
+	url = https://github.com/crisng95/flowkit.git
