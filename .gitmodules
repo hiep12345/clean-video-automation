@@ -1,3 +1,6 @@
 [submodule "flowkit-engine"]
 	path = flowkit-engine
-	url = https://github.com/crisng95/flowkit.git
+	url = https://github.com/hiep12345/flowkit.git
+[submodule "content-planner-kb"]
+	path = content-planner-kb
+	url = https://github.com/hiep12345/content-planner-kb.git
