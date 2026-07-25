@@ -56,8 +56,14 @@ khác mà chưa có bàn giao rõ ràng.
 
 ## 4. Quy trình Git
 
-- Công việc mới dùng branch riêng. Mặc định Codex dùng `codex/<task>` và
-  Antigravity dùng `antigravity/<task>`, trừ khi người dùng chỉ định branch khác.
+- Tên branch phải trung lập với người/agent và theo mẫu
+  `<type>/<scope>-<description>`.
+- `type` được dùng: `feat`, `fix`, `chore`, `docs`, `refactor`, `test`, `ci`,
+  `hotfix`.
+- Dùng chữ thường và kebab-case, ví dụ `feat/dashboard-export`,
+  `fix/flowkit-timeout`, `chore/repository-governance`.
+- Ghi chủ sở hữu trong `WORKSPACE ACK` hoặc task tracker; không đưa tên người,
+  Codex hay Antigravity vào tên branch.
 - Không commit trực tiếp lên `main` hoặc `dev`.
 - Chỉ stage đường dẫn cụ thể bằng `git add -- <path>`.
 - Không dùng `git add .` hoặc `git add -A` trong workspace có nhiều agent.
