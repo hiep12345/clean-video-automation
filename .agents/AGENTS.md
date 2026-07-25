@@ -20,6 +20,8 @@ này, Antigravity 2 không được switch branch, stage, commit, rebase hay pus
 ## Phối hợp
 
 - Không ghi vào file đang thuộc write scope của agent khác.
+- Dùng `.agents/config/agent-routing.md` làm nguồn định tuyến cho các agent
+  chuyên biệt. Workflow không được gọi tên agent không có trong bảng này.
 - Chỉ dùng sub-agent khi task thực sự cần và nền tảng hiện tại hỗ trợ; không
   coi file cấu hình tùy chọn là điều kiện bắt buộc để làm việc.
 - Không tạo file tiến độ hoặc task Markdown tạm ở root.
