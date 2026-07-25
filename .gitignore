@@ -20,7 +20,7 @@ node_modules/
 # Project specific
 scratch/
 output/
-.agents/state/task_agent.db
+.agents/state/*.db*
 test.png
 
 # OS generated files

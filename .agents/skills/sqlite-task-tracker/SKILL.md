@@ -66,12 +66,12 @@ erDiagram
 
 ## 💻 Python API Standard Patterns
 
-Không tự ý kết nối trực tiếp đến file DB bằng `sqlite3.connect` trong các script khác. **Bắt buộc phải import [task_manager.py](../../../scripts/task_manager.py)** để thao tác dữ liệu:
+Không tự ý kết nối trực tiếp đến file DB bằng `sqlite3.connect` trong các script khác. **Bắt buộc phải dùng [task_manager.py](../../../content-planner-kb/scripts/task_manager.py)** để thao tác dữ liệu:
 
 ```python
 import sys
 from pathlib import Path
-sys.path.append(str(Path(__file__).parent.parent / "scripts"))
+sys.path.append(str(Path(__file__).resolve().parents[3] / "content-planner-kb" / "scripts"))
 import task_manager
 
 # 1. Tạo task mới (kèm dependencies nếu có)
@@ -120,13 +120,13 @@ Sử dụng trực tiếp CLI của `task_manager.py` khi cần debug thủ côn
 
 *   **Xem thông tin chi tiết 1 Task**:
     ```bash
-    python scripts/task_manager.py get --id <task_id> --json
+    python content-planner-kb/scripts/task_manager.py get --id <task_id> --json
     ```
 *   **Liệt kê toàn bộ các Task đang chạy ngầm/chờ xử lý**:
     ```bash
-    python scripts/task_manager.py list --status PENDING --json
+    python content-planner-kb/scripts/task_manager.py list --status PENDING --json
     ```
 *   **Chạy dọn dẹp thủ công**:
     ```bash
-    python scripts/task_manager.py prune --days 60
+    python content-planner-kb/scripts/task_manager.py prune --days 60
     ```
