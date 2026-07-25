@@ -21,6 +21,7 @@ node_modules/
 scratch/
 output/
 .agents/state/*.db*
+.agents/state/backups/
 test.png
 
 # OS generated files
