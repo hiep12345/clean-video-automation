@@ -24,6 +24,24 @@ git submodule update --init content-planner-kb
 
 `content-planner-kb` là repository riêng tư nên lệnh cuối yêu cầu tài khoản GitHub có quyền truy cập. Thư viện nhạc trong `content-planner-kb/resources/bgm/` là dữ liệu cục bộ, không được lưu trên GitHub.
 
+## Shared integration configuration
+
+Copy `.env.example` to the workspace-root `.env` and keep real values local.
+Shared `NOTION_*` settings belong in this root file, not inside either
+submodule. Google Drive OAuth files belong under `.secrets/google-drive/` or
+at the paths configured by `GDRIVE_CREDENTIALS_FILE` and `GDRIVE_TOKEN_FILE`.
+Both locations are ignored by Git.
+
+Buffer publishing is fail-closed and dry-run by default:
+
+```bash
+python content-planner-kb/scripts/publish_buffer.py --channel mt
+python content-planner-kb/scripts/publish_buffer.py --channel mt --apply
+```
+
+Only media with a QA PASS receipt and a verified Drive link can enter Notion
+with `Ready` status.
+
 ## Quy tắc Phát triển
 
 - Mọi thay đổi code hoặc logic đều phải làm trên branch riêng theo mẫu trung lập với agent: `<type>/<scope>-<description>`.

@@ -36,7 +36,7 @@ Notion sync and archive are not part of analytics collection. If the user
 requests them, run and review these dry runs first:
 
 ```text
-python content-planner-kb/scripts/notion_sync.py --dry-run
+python content-planner-kb/scripts/publish_buffer.py --all-active
 python content-planner-kb/scripts/archive_old_uploads.py --dry-run
 ```
 
