@@ -34,12 +34,15 @@ root file, not inside either submodule. Google Drive OAuth files belong under
 Access Tokens belong in `.secrets/facebook/pages.json`, configurable through
 `FB_PAGES_CONFIG`. All secret locations are ignored by Git.
 
-Facebook setup and redacted preflight:
+Facebook read-only credential setup and redacted preflight:
 
 ```bash
 python content-planner-kb/scripts/fb_upload_reel.py setup
 python content-planner-kb/scripts/facebook_config.py --page science-unlocked
 ```
+
+Facebook publishing is manual-only. Agents and automation may use the Page
+credential for sync/insights but cannot upload or publish Posts/Reels.
 
 Buffer publishing is fail-closed and dry-run by default:
 

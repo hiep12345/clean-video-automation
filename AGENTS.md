@@ -92,6 +92,9 @@ khác mà chưa có bàn giao rõ ràng.
   trị secret.
 - Không upload nội dung, gửi email, xuất bản lên mạng xã hội, bật billing hoặc
   thực hiện hành động bên ngoài không thể hoàn tác khi chưa có lệnh trực tiếp.
+- Facebook content publishing hiện ở chế độ `manual-only`: mọi agent và
+  automation bị cấm gọi API upload/publish Reel hoặc Post. Chỉ các tác vụ đọc
+  dữ liệu như topic sync và insights được phép dùng Facebook Page Token.
 
 ## 6. Kiểm tra và bàn giao
 
