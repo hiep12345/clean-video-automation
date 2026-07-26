@@ -68,6 +68,21 @@ thực hiện theo cùng ranh giới vai trò; không được tuyên bố đã 
   có thể truy cập; morphology phải đối chiếu ảnh tham chiếu thực tế.
 - Parent phải bác bỏ PASS thiếu bằng chứng, có checklist chưa hoàn thành hoặc
   có lỗi nhìn thấy được, kể cả receipt đúng schema/hash.
+- Search snippet, tiêu đề bài báo hoặc DOI đứng riêng chỉ dùng để tìm nguồn,
+  không phải bằng chứng đã kiểm tra. Với claim khoa học, `qa-reviewer` phải mở
+  nguồn đã chọn bằng `read_url_content` và ghi evidence receipt theo
+  `.agents/agents/qa-reviewer/references/evidence-contract.md`.
+- Parent chỉ được dùng các từ `cross-checked`, `verified` hoặc tương đương khi
+  chính parent đã mở ít nhất một nguồn sơ cấp quyết định bằng
+  `read_url_content`, đối chiếu metadata/điều kiện nghiên cứu và ghi
+  `PARENT EVIDENCE RECEIPT` gồm URL đã mở, tool, claim đã kiểm tra và kết quả.
+  Nếu không có receipt này, parent phải ghi `parent_cross_check: not performed`.
+- DOI sai tiêu đề/tác giả/đối tượng, claim dùng nhầm môi trường thí nghiệm,
+  morphology không có reference thực tế, hoặc thiếu tool receipt đều phải fail
+  closed: `UNVERIFIED`/`Unsupported`, không PASS.
+- Chỉ artifact có `drive_buffer_eligible: true` trong QA gate receipt hợp lệ
+  mới được xem là đủ điều kiện cho bước Drive hoặc Notion Buffer. Receipt
+  không tự cấp quyền chạy upload/sync; quyền bên ngoài vẫn theo lệnh người dùng.
 - Không chạy upload hoặc sync để “thử” một artifact chưa qua gate. Dry-run
   không thay thế QA.
 

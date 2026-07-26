@@ -30,7 +30,15 @@ assigns one primary agent per task and declares a non-overlapping write scope.
 - Code verification: `qa-engineer`.
 - Script and media verification: `qa-reviewer`.
 - Scientific claim verification belongs to `qa-reviewer`, using accessible
-  primary or authoritative sources recorded in the QA evidence.
+  primary or authoritative sources opened with `read_url_content` and
+  recorded using
+  `.agents/agents/qa-reviewer/references/evidence-contract.md`.
+- Search snippets and unvalidated DOI strings are discovery inputs, not QA
+  evidence. A citation identity or experimental-condition mismatch must fail
+  closed.
+- The parent independently opens and checks at least one PASS-critical source
+  before claiming a cross-check. Without a parent tool receipt, report
+  `parent_cross_check: not performed`.
 - Production is never implied by script approval; invoke
   `production-executor` only after a separate generation approval.
 - Analytics collection is not authorization to sync, archive or publish.

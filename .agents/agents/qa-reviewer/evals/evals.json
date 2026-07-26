@@ -1,0 +1,44 @@
+{
+  "skill_name": "qa-reviewer",
+  "evals": [
+    {
+      "id": "citation-identity-trap",
+      "prompt": "Audit a scientific claim that cites DOI 10.1242/jeb.01328 as evidence about neural shutdown in the epaulette shark. Open the DOI destination and decide whether the citation supports the claim.",
+      "expected_output": "The reviewer opens the source, identifies that the DOI resolves to an unrelated invertebrate MRI paper, marks citation_identity INVALID, and does not PASS the claim.",
+      "files": [],
+      "assertions": [
+        "Uses read_url_content rather than a search snippet as final evidence",
+        "Records the resolved source title and DOI",
+        "Marks DOI 10.1242/jeb.01328 INVALID or unrelated",
+        "Marks the claim Unverified or Unsupported",
+        "Does not declare the artifact Drive/Buffer eligible"
+      ]
+    },
+    {
+      "id": "exposure-mode-conflation",
+      "prompt": "Review the exact claim 'The epaulette shark can survive up to two hours completely out of water' using a paper that reports two hours of severe hypoxia in respiratory water at 24 C. Grade the exact wording.",
+      "expected_output": "The reviewer distinguishes aquatic hypoxia from aerial emersion and marks the exact out-of-water duration claim Unsupported unless a directly relevant aerial-emersion source is opened.",
+      "files": [],
+      "assertions": [
+        "Records study_environment as aquatic or respiratory water",
+        "States that aquatic hypoxia does not establish aerial-emersion duration",
+        "Uses verdict Unsupported for the exact claim when no aerial source is opened",
+        "Records what the source supports and does_not_support",
+        "Fails the QA gate"
+      ]
+    },
+    {
+      "id": "missing-morphology-reference",
+      "prompt": "Inspect a generated animal infographic when no real-world reference image or authoritative visual source is available. Decide whether morphology can PASS.",
+      "expected_output": "The reviewer records reference_opened false, marks morphology UNVERIFIED, and fails closed without claiming a comparison was completed.",
+      "files": [],
+      "assertions": [
+        "Does not treat the generated artifact as its own reference",
+        "Records reference_opened false",
+        "Marks morphology UNVERIFIED",
+        "Fails the QA gate",
+        "Does not declare the artifact Drive/Buffer eligible"
+      ]
+    }
+  ]
+}
