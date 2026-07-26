@@ -24,7 +24,13 @@ EXPECTED_TOOLS = {
         "write_to_file",
         "run_command",
     },
-    "qa-reviewer": {"view_file", "run_command", "write_to_file"},
+    "qa-reviewer": {
+        "view_file",
+        "search_web",
+        "read_url_content",
+        "run_command",
+        "write_to_file",
+    },
     "script-writer": {
         "view_file",
         "grep_search",
@@ -106,7 +112,9 @@ class AgentDefinitionTests(unittest.TestCase):
                 self.assertIn("# Agent System Instructions", text)
                 self.assertIn("Read `AGENTS.md`", text)
                 self.assertIn("`WORKSPACE ACK`", text)
-                self.assertIn("Git integrator: Không có — read-only", text)
+                self.assertIn("Git authority: none", text)
+                self.assertIn("Task mode:", text)
+                self.assertNotIn("Git integrator: Không có — read-only", text)
                 self.assertIn("dirty", text.lower())
                 self.assertRegex(text, r"Never (mutate Git|switch branches)")
 
@@ -138,6 +146,32 @@ class AgentDefinitionTests(unittest.TestCase):
         adapter = (ROOT / ".agents" / "AGENTS.md").read_text(encoding="utf-8")
         self.assertIn(".agents/config/agent-routing.md", adapter)
 
+    def test_coordinator_and_independent_acceptance_contract(self):
+        """Parent must delegate complex work and reject self-signed media QA."""
+        adapter = (ROOT / ".agents" / "AGENTS.md").read_text(encoding="utf-8")
+        routing = ROUTING_FILE.read_text(encoding="utf-8")
+        self.assertIn("Strategic Coordinator", adapter)
+        self.assertIn("invoke_subagent", adapter)
+        self.assertIn("từ ba file", adapter)
+        self.assertIn("mười tool call", adapter)
+        self.assertIn("không được tự ký PASS", adapter)
+        self.assertIn("qa-reviewer", adapter)
+        self.assertIn("The agent that", routing)
+        self.assertIn("cannot approve its publication gate", routing)
+
+    def test_content_hot_cache_uses_current_readable_governance(self):
+        """The Antigravity hot cache must stay UTF-8 and avoid stale sections."""
+        hot_cache = (ROOT / "content-planner-kb" / "GEMINI.md").read_text(
+            encoding="utf-8"
+        )
+        self.assertIn('File này là "bộ nhớ nóng"', hot_cache)
+        self.assertIn("../.agents/AGENTS.md", hot_cache)
+        self.assertIn("../.agents/config/agent-routing.md", hot_cache)
+        self.assertIn("invoke_subagent", hot_cache)
+        self.assertNotIn("superpowers:subagent-driven-development", hot_cache)
+        self.assertNotIn("AGENTS.md §3 (Coordinator Pattern)", hot_cache)
+        self.assertLessEqual(len(hot_cache.splitlines()), 130)
+
     def test_high_risk_role_boundaries_are_explicit(self):
         """Production, analytics and QA must fail closed at role boundaries."""
         texts = {
@@ -159,6 +193,10 @@ class AgentDefinitionTests(unittest.TestCase):
         self.assertIn(
             "L1/L2/L3 content-media QA",
             ROUTING_FILE.read_text(encoding="utf-8"),
+        )
+        self.assertIn(
+            "record the exact source URL/DOI",
+            texts["qa-reviewer"],
         )
 
     def test_required_static_references_exist(self):

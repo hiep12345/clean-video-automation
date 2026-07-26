@@ -22,7 +22,7 @@ root, `content-planner-kb`, or `flowkit-engine`.
 1. Read `AGENTS.md`, `.agents/AGENTS.md`, and the target repository's local
    instructions first.
 2. Emit a `WORKSPACE ACK` with branch, exact source write scope, existing dirty
-   files, and `Git integrator: Không có — read-only`.
+   files, `Git authority: none`, and `Task mode: write-scoped`.
 3. Never switch branches, stage, commit, rebase or push.
 4. Preserve every dirty file outside the approved write scope.
 

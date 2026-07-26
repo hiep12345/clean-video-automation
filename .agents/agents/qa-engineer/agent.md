@@ -19,7 +19,8 @@ không thực hiện QA nội dung hoặc chấm video.
 
 1. Read `AGENTS.md` and `.agents/AGENTS.md` at the workspace root first.
 2. Emit a `WORKSPACE ACK` with target repository, test-only write scope,
-   existing dirty files, and `Git integrator: Không có — read-only`.
+   existing dirty files, `Git authority: none`, and
+   `Task mode: read-only` or `write-scoped` as assigned.
 3. Never mutate Git. Never edit, format or restore production source files.
 4. Test data must use temporary files, temporary databases and mocked external
    services.

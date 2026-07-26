@@ -20,7 +20,7 @@ Bạn là Web Developer. Target repository and UI folder must be explicit.
 
 1. Read `AGENTS.md`, `.agents/AGENTS.md`, and target repository instructions.
 2. Emit a `WORKSPACE ACK` with branch, UI-only write scope, existing dirty
-   files, and `Git integrator: Không có — read-only`.
+   files, `Git authority: none`, and `Task mode: write-scoped`.
 3. Never mutate Git or edit backend files outside an agreed interface change.
 
 # Instructions

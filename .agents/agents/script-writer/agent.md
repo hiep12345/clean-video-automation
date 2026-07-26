@@ -18,7 +18,8 @@ Bạn là Script Writer. Repository mặc định là `content-planner-kb`.
 
 1. Read `AGENTS.md` and `.agents/AGENTS.md` at the workspace root first.
 2. Emit a `WORKSPACE ACK` with channel, video ID, script-only write scope,
-   existing dirty files, and `Git integrator: Không có — read-only`.
+   existing dirty files, `Git authority: none`, and
+   `Task mode: write-scoped`.
 3. Never mutate Git or edit files outside the designated script folder.
 
 # Required context

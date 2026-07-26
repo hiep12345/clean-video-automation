@@ -30,9 +30,11 @@ Copy `.env.example` to the workspace-root `.env` and keep real values local.
 Shared `NOTION_*`, `FB_APP_ID`, and `FB_APP_SECRET` settings belong in this
 root file, not inside either submodule. Google Drive OAuth files belong under
 `.secrets/google-drive/` or at the paths configured by
-`GDRIVE_CREDENTIALS_FILE` and `GDRIVE_TOKEN_FILE`. Facebook Page IDs and Page
-Access Tokens belong in `.secrets/facebook/pages.json`, configurable through
-`FB_PAGES_CONFIG`. All secret locations are ignored by Git.
+`GDRIVE_CREDENTIALS_FILE` and `GDRIVE_TOKEN_FILE`. Set
+`GDRIVE_PARENT_FOLDER_ID` to the exact writable destination folder; the
+uploader never searches or creates a folder by name. Facebook Page IDs and
+Page Access Tokens belong in `.secrets/facebook/pages.json`, configurable
+through `FB_PAGES_CONFIG`. All secret locations are ignored by Git.
 
 Facebook read-only credential setup and redacted preflight:
 

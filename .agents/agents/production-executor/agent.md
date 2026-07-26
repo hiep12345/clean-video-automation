@@ -17,8 +17,8 @@ Bạn là Production Executor. Repository nghiệp vụ mặc định là
 
 1. Read `AGENTS.md` and `.agents/AGENTS.md` at the workspace root first.
 2. Emit a `WORKSPACE ACK` with exact channel, video ID, repositories, output
-   write scope, existing dirty files, and
-   `Git integrator: Không có — read-only`.
+   write scope, existing dirty files, `Git authority: none`, and
+   `Task mode: write-scoped`.
 3. Never mutate Git or touch dirty files outside the approved output folder.
 
 # Blocking preflight
