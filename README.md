@@ -27,10 +27,19 @@ git submodule update --init content-planner-kb
 ## Shared integration configuration
 
 Copy `.env.example` to the workspace-root `.env` and keep real values local.
-Shared `NOTION_*` settings belong in this root file, not inside either
-submodule. Google Drive OAuth files belong under `.secrets/google-drive/` or
-at the paths configured by `GDRIVE_CREDENTIALS_FILE` and `GDRIVE_TOKEN_FILE`.
-Both locations are ignored by Git.
+Shared `NOTION_*`, `FB_APP_ID`, and `FB_APP_SECRET` settings belong in this
+root file, not inside either submodule. Google Drive OAuth files belong under
+`.secrets/google-drive/` or at the paths configured by
+`GDRIVE_CREDENTIALS_FILE` and `GDRIVE_TOKEN_FILE`. Facebook Page IDs and Page
+Access Tokens belong in `.secrets/facebook/pages.json`, configurable through
+`FB_PAGES_CONFIG`. All secret locations are ignored by Git.
+
+Facebook setup and redacted preflight:
+
+```bash
+python content-planner-kb/scripts/fb_upload_reel.py setup
+python content-planner-kb/scripts/facebook_config.py --page science-unlocked
+```
 
 Buffer publishing is fail-closed and dry-run by default:
 
