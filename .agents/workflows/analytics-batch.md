@@ -1,55 +1,71 @@
 ---
 name: analytics-batch
-description: "Fetch FB + YT analytics cho tất cả kênh active song song via sub-agents. Output: Handover.md / SQLite DB buffer update."
-trigger: "analytics-batch"
-subagent_config: .agents/config/subagent-team.md § Analytics Team
+description: "Refresh Facebook analytics mới nhất bằng credential registry và Graph API"
+trigger: "analytics-batch | cập nhật số liệu Facebook mới nhất | refresh Facebook analytics"
+subagent_config: .agents/config/agent-routing.md
 ---
 
-# analytics-batch — Parallel Analytics Collection
+# Facebook analytics refresh
 
-## Mục đích
-Thu thập FB Page Insights cho tất cả kênh active cùng lúc, tổng hợp vào SQLite DB và Handover.md.
-Thay thế serial loop (4 API calls tuần tự) bằng 4 sub-agents song song.
+## Preflight
 
-## Pre-flight
-```
-□ Check artifact trước: output/analytics/fb_<channel>_<today>.json tồn tại → SKIP channel đó
-□ Verify FB token: python scripts/fb_page_insights.py --check-token
-  FAIL → báo user "FB token expired", DỪNG
-```
+1. Read root agent rules and the routing table.
+2. Treat "các kênh hiện tại" as the intersection of active channel configs and
+   Pages in the secure Facebook registry. Do not hardcode channel names.
+3. Never ask the user to paste a token into chat or pass a token through a CLI
+   argument. If credentials are missing, stop with the interactive command:
+   `python content-planner-kb/scripts/fb_credentials.py setup`.
+4. Declare write scope under `content-planner-kb/output/analytics/`.
+5. If the user requests "mới nhất", old artifacts may be used only for
+   comparison; they do not satisfy the refresh.
 
-## Execution
+Run the local, no-network preflight:
 
-### Step 1 — Spawn 4 fb-analyst sub-agents đồng thời
-```python
-# Parent invokes sub-agents dynamically per active channel from config/channels/:
-# For each <channel-slug> with a valid fb_page_id:
-invoke_subagent("fb-analyst-<SLUG>",
-  prompt="Run: python scripts/fb_page_insights.py --page <channel-slug> --save
-  Output: output/analytics/fb_<channel-slug>_<today>.json
-  Report: follower_count, avg_views, post_count")
+```text
+python content-planner-kb/scripts/fb_credentials.py check
+python content-planner-kb/scripts/fb_refresh.py --dry-run
 ```
 
-### Step 2 — Wait for all 4, then consolidate
-```
-Parent đọc 4 output JSON files → tổng hợp:
-  - Follower count per channel
-  - Avg views (last 30 posts)
-  - Buffer count (final.mp4 without uploaded.flag)
-  - Top performing post (highest views)
+## Collection
+
+Route collection and analysis to `analytics-manager`. The canonical command for
+all current eligible channels is:
+
+```text
+python content-planner-kb/scripts/fb_refresh.py --json
 ```
 
-### Step 3 — Update Handover.md & SQLite DB
-```
-Cập nhật bảng điểm và thống kê buffer vào channel.db và tổng hợp vào Handover.md.
+For an exact subset, repeat `--channel`:
+
+```text
+python content-planner-kb/scripts/fb_refresh.py \
+  --channel <slug-a> --channel <slug-b> --json
 ```
 
-## Output
-- 4 analytics JSON files in `output/analytics/`
-- `Handover.md` § Buffer Status updated
-- Report to CC inbox: `cc_analytics-batch-<date>.md`
+The command reads Facebook analytics and writes only:
+`content-planner-kb/output/analytics/fb_<channel>_<YYYYMMDD>.json`.
 
-## Error Handling
-- 1 channel fail → log error, continue other 3, report gap in summary
-- Token expired → STOP ALL, write to CC inbox immediately
-- Rate limit → retry once after 30s, then report
+Do not add `--update-scorecards` unless the user explicitly requests local
+scorecard updates. Do not add `--sync-flags` and do not run
+`fb_sync_topics.py`; those mutate local tracking state and are separate tasks.
+
+## Completion evidence
+
+The parent must verify all of the following before reporting success:
+
+- every requested channel has `status: COMPLETED`;
+- every reported artifact exists, is non-empty, and parses as JSON;
+- `pulled_at` comes from the current refresh, not an older fallback;
+- missing-credential and API failures are reported as blocked/failed, never
+  silently replaced with stale numbers;
+- no token material appears in output or task evidence.
+
+Record the redacted summary and artifact paths in
+`.agents/state/task_agent.db` through `task_manager.py`.
+
+## State-changing follow-up
+
+Facebook publishing, topic reconciliation, Buffer mutation, Notion sync,
+archive, comment actions, and scorecard updates are not implied by analytics
+collection. These actions are not part of analytics collection. Each requires
+a separate explicit task and applicable approval.

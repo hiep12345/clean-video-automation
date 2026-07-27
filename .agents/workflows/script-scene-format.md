@@ -7,6 +7,19 @@
 
 ## 1. scene_plan Frontmatter — Machine-Readable SSOT
 
+### Channel production profile
+
+Trước khi áp dụng ví dụ tổng quát bên dưới, đọc
+`config/channels/<channel-slug>.json`. Nếu có `production_profile`:
+
+- dùng chính xác `script_formula_path` và `script_template_path` được cấu hình;
+- giữ nguyên role, thứ tự, lineage, model và native duration trong template;
+- không downgrade model khi `require_exact_model: true`;
+- chạy `scripts/production_profile.py` và chỉ gọi Flow sau khi preflight PASS.
+
+Các duration 4/6/8/10 giây trong bảng dưới là năng lực chung của Flow, không
+phải quyền tự thay đổi native duration đã khóa trong production profile.
+
 ```yaml
 ---
 generation_method: sequential-end-frame

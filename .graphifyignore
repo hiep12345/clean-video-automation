@@ -1,0 +1,52 @@
+# Generated, dependency, and repository internals
+.git/
+**/.git/
+graphify-out/
+**/graphify-out/
+node_modules/
+**/node_modules/
+__pycache__/
+**/__pycache__/
+.venv/
+**/.venv/
+venv/
+**/venv/
+
+# Runtime and media
+output/
+**/output/
+scratch/
+**/scratch/
+.agents/state/
+.agents/results/
+**/*.db
+**/*.sqlite
+**/*.sqlite3
+**/*.log
+**/*.zip
+**/*.mp4
+**/*.mov
+**/*.wav
+**/*.mp3
+**/*.png
+**/*.jpg
+**/*.jpeg
+**/*.gif
+
+# Secrets and local credentials
+.env
+.env.*
+**/.env
+**/.env.*
+.secrets/
+**/.secrets/
+**/credentials*.json
+**/client_secret*.json
+**/token*.json
+
+# IDE-generated state
+.vscode/
+**/.vscode/
+.idea/
+**/.idea/
+**/.obsidian/

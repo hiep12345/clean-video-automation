@@ -1,0 +1,61 @@
+name: CI Pipeline
+
+on:
+  push:
+    branches: [ "main", "dev" ]
+  pull_request:
+    branches: [ "main", "dev" ]
+
+jobs:
+  secret-scan:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+    - uses: actions/checkout@v6
+      with:
+        fetch-depth: 0
+
+    - name: Scan Git history for secrets
+      uses: gitleaks/gitleaks-action@v3
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        GITLEAKS_ENABLE_COMMENTS: "false"
+
+  build-and-test:
+    runs-on: ubuntu-latest
+    env:
+      PUPPETEER_SKIP_DOWNLOAD: 'true'
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Initialize public FlowKit submodule
+      run: git submodule update --init --recursive flowkit-engine
+    
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.10'
+
+    - name: Check Python syntax
+      run: python -m compileall -q dashboard test
+
+    - name: Run dashboard server tests
+      run: python -m unittest discover -s test -p "test_*.py" -v
+
+    - name: Set up Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: 22
+        cache: npm
+
+    - name: Install Node dependencies
+      run: npm ci
+
+    - name: Run Node tests
+      run: npm test
+        
+    - name: Validate Markdown Files
+      run: |
+        test -f README.md
+        test -f Handover.md

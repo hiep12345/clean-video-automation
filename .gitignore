@@ -11,17 +11,19 @@ venv.bak/
 
 # Node
 node_modules/
-package-lock.json
 
 # Environment
 .env
 .env.*
 !.env.example
+.secrets/
 
 # Project specific
 scratch/
 output/
-.agents/state/task_agent.db
+graphify-out/
+.agents/state/*.db*
+.agents/state/backups/
 test.png
 
 # OS generated files

@@ -765,7 +765,7 @@
       btn.innerHTML = 'Syncing...';
       
       try {
-        const response = await fetch('/api/sync');
+        const response = await fetch('/api/sync', { method: 'POST' });
         const data = await response.json();
         if (data.ok) {
           showToast(data.message);
