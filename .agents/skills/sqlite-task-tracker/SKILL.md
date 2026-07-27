@@ -130,3 +130,26 @@ Sử dụng trực tiếp CLI của `task_manager.py` khi cần debug thủ côn
     ```bash
     python content-planner-kb/scripts/task_manager.py prune --days 60
     ```
+
+## Git Closeout Gate
+
+Task có ghi code/config/tài liệu phải được tạo kèm Git metadata:
+
+```powershell
+python content-planner-kb/scripts/task_manager.py create `
+  --id <task-id> --channel workspace --action custom --assigned <agent> `
+  --git-required --repository <repo> --branch <feature-branch> `
+  --write-scope "<path1>,<path2>"
+```
+
+Agent thực thi bàn giao cho Git integrator. Sau khi test, commit và push feature
+branch, Git integrator closeout:
+
+```powershell
+python content-planner-kb/scripts/task_manager.py closeout `
+  --id <task-id> --tests "<checks: PASS>" --commit <sha> `
+  --push-status pushed --result "<summary>"
+```
+
+`COMPLETED` bị chặn nếu thiếu evidence. `deferred` chỉ hợp lệ khi kèm
+`--push-reason`. Không dùng closeout để tự stage file hoặc thay thế review diff.

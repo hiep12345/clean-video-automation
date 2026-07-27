@@ -54,6 +54,25 @@ khác mà chưa có bàn giao rõ ràng.
 - Nếu cần hai agent viết song song trong cùng repo, phải dùng worktree tách biệt
   đã được thống nhất trước; không tự tạo worktree trong lúc agent khác đang làm.
 
+## 3.1. Định tuyến tri thức và Map Before Move
+
+- `content-planner-kb/obsidian-kb/` là nguồn tri thức được biên soạn cho công
+  thức kênh, policy, learning và quyết định nghiệp vụ.
+- SQLite, Notion và runtime API là nguồn trạng thái vận hành; không suy ra
+  trạng thái hiện tại chỉ từ Obsidian hoặc Graphify.
+- `graphify-out/` là bản đồ dẫn xuất có khai báo `coverage`, có thể xóa và build
+  lại; không chỉnh sửa hoặc commit nội dung được sinh ra. `update` mặc định chỉ
+  phủ code; note/config chỉ được đưa vào graph bởi semantic `deep`.
+- Trước refactor kiến trúc, đổi tên API/hàm/thư mục hoặc sửa luồng dữ liệu xuyên
+  nhiều component, agent phải áp dụng skill `Graphify Knowledge` và kiểm tra:
+  `python content-planner-kb/scripts/update_knowledge_graph.py status --json`.
+- Nếu graph thiếu hoặc stale, làm theo `required_action` do lệnh status trả về.
+  Chế độ `deep` dùng Gemini chỉ được chạy khi người dùng đã cho phép hành động
+  có thể tiêu tốn API credit. Nếu Graphify lỗi, báo rõ rồi fallback sang `rg` và
+  đọc source.
+- Với chỉnh sửa nhỏ, tìm chuỗi chính xác hoặc một file đã biết, tiếp tục dùng
+  `rg`; không lạm dụng Graphify.
+
 ## 4. Quy trình Git
 
 - Tên branch phải trung lập với người/agent và theo mẫu
@@ -108,3 +127,20 @@ Trước khi báo hoàn thành:
 
 Không tuyên bố hoàn thành nếu test bắt buộc chưa chạy hoặc kết quả Git chưa được
 kiểm tra.
+
+### Git Closeout Gate
+
+- Task có ghi code/config/tài liệu phải được tạo với `git_required=true` trong
+  task tracker, kèm repository, feature branch và write scope.
+- Trạng thái `COMPLETED` chỉ hợp lệ sau khi có evidence cho test, commit SHA và
+  push status. Mặc định Git integrator commit và push feature branch sau khi
+  test đạt; merge vẫn cần lệnh riêng của người dùng.
+- `deferred` chỉ dùng khi có lý do cụ thể. Nếu chưa có Git integrator hoặc test
+  chưa đạt, task giữ `IN_PROGRESS`; không bắt đầu task không liên quan để chồng
+  thêm dirty files.
+- Chỉ Git integrator chạy lệnh `closeout`. Agent thực thi khác phải bàn giao
+  danh sách file, test và dirty files, không tự đánh dấu task ghi code là
+  `COMPLETED`.
+- Closeout không được tự động stage toàn workspace, không dùng `git add .`, và
+  không được đưa secret, runtime state, database hay generated output vào
+  commit.

@@ -21,6 +21,7 @@ node_modules/
 # Project specific
 scratch/
 output/
+graphify-out/
 .agents/state/*.db*
 .agents/state/backups/
 test.png

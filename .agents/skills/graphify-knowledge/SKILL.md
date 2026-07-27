@@ -1,34 +1,83 @@
 ---
 name: Graphify Knowledge
-description: Đọc và truy vấn Đồ thị Tri thức (Knowledge Graph) của hệ thống bằng Graphify. Sử dụng khi cần phân tích kiến trúc, tìm kiếm mối quan hệ giữa các file (AST/References) hoặc khi lệnh grep_search truyền thống không mang lại kết quả rõ ràng trong codebase lớn.
+description: "Truy vấn Knowledge Graph của toàn workspace để phân tích kiến trúc, impact, call/reference paths và quan hệ giữa code, config, tài liệu Obsidian. Dùng skill này trước các refactor lớn, đổi API/hàm/thư mục, sửa luồng dữ liệu chính, hoặc khi cần hiểu một tính năng trải qua nhiều repository; không dùng cho chỉnh sửa nhỏ có thể giải quyết bằng rg."
+risk: safe
+updated: "2026-07-27"
 ---
 
-# 🕸️ Kỹ năng Sử dụng Graphify (Graph RAG)
+# Graphify Knowledge
 
-Khi làm việc với các hệ thống phức tạp, tài liệu rải rác ở nhiều nơi (`learnings.md`, `AGENTS.md`, `config/channels/`, `scripts/`), việc tìm kiếm bằng `grep_search` thuần túy có thể dẫn đến việc thiếu ngữ cảnh hoặc bị chìm trong hàng ngàn kết quả không liên quan. 
+Graphify là bản đồ dẫn xuất của workspace, không phải một nguồn sự thật mới.
+Code/config và Obsidian vẫn là dữ liệu gốc; `graphify-out/` có thể xóa và build
+lại bất kỳ lúc nào. Luôn đọc trường `coverage`: bản local mặc định chỉ phủ code;
+note Obsidian chỉ có trong graph sau semantic deep scan.
 
-Kỹ năng này cung cấp các nguyên tắc sử dụng **Graph RAG** thông qua `graphify-out/graph.json` - bản đồ toàn thư của hệ thống.
+## 1. Chọn đúng nguồn
 
-## 1. Nguyên Tắc Vận Hành (Khi nào dùng?)
-- **Tránh Lạm dụng:** Đừng gọi Graphify cho những sửa đổi nhỏ 1 dòng (ví dụ: đổi text, sửa tham số truyền vào). Hãy tiếp tục dùng `grep_search` và `view_file` cho các tác vụ đơn giản.
-- **Bắt buộc dùng khi Refactor (Kiến trúc):** Khi được yêu cầu thay đổi tên hàm, cấu trúc thư mục, hoặc sửa đổi luồng dữ liệu chính (như `produce_pipeline.py`), Đặc vụ **BẮT BUỘC** phải tra cứu đồ thị để đảm bảo nguyên tắc "Map Before Move".
-- **Khi làm việc với Codebase chưa biết:** Khi Sếp hỏi "Tính năng X nằm ở đâu?", thay vì mò mẫm, hãy xem qua đồ thị.
+- Tri thức nghiệp vụ, công thức kênh, policy, learning: đọc
+  `content-planner-kb/obsidian-kb/`.
+- Trạng thái vận hành hiện tại: đọc SQLite, Notion hoặc runtime API phù hợp.
+- Tìm chuỗi chính xác hoặc sửa nhỏ trong một file: dùng `rg` và đọc source.
+- Kiến trúc, impact, call path hoặc quan hệ xuyên repo: dùng Graphify trước.
 
-## 2. Cách Thực Thi (How to use)
-Do Đồ thị Tri thức đã được Cron Job tự động build và lưu tại `graphify-out/graph.json`, Đặc vụ không cần chạy lại lệnh extract (rất tốn thời gian). Thay vào đó, hãy **đọc trực tiếp file JSON đó**.
+Graphify giúp thu hẹp phạm vi cần đọc; kết luận quan trọng vẫn phải được xác
+nhận từ source thật.
 
-### Phương pháp truy vấn `graph.json`:
-Bạn có thể sử dụng `grep_search` trên chính file `graph.json` để tìm tên hàm hoặc tên file.
-Ví dụ:
-```python
-# Gọi lệnh terminal nội bộ để truy xuất các Cạnh (Edges) liên quan đến file hoặc hàm cụ thể
-cat graphify-out/graph.json | grep -i "tên_hàm_hoặc_tên_file" -C 5
+## 2. Health check trước khi truy vấn
+
+Chạy từ root `clean-video-automation`:
+
+```powershell
+python content-planner-kb/scripts/update_knowledge_graph.py status --json
 ```
-*(Nếu hệ thống tích hợp sẵn plugin `/graphify`, bạn có thể gọi thẳng lệnh `graphify query`)*.
 
-## 3. Cập nhật Đồ thị
-Đồ thị sẽ được cập nhật tự động hàng tuần. Tuy nhiên, nếu bạn vừa thực hiện một đợt Refactor cực lớn (thay đổi hàng chục file code) và cần bản đồ mới ngay lập tức, bạn có thể tự mình khởi chạy lại trình xây dựng:
-```bash
-python scripts/update_knowledge_graph.py
+- `FRESH`: truy vấn graph trong đúng phạm vi ghi tại `coverage`.
+- `STALE` và `required_action=update`: chạy bản cập nhật AST cục bộ:
+
+```powershell
+python content-planner-kb/scripts/update_knowledge_graph.py update --json
 ```
-*(Lưu ý: Quá trình này có thể tốn vài phút và sẽ tiêu tốn Gemini API Token).*
+
+`update` không dùng LLM hay API credit và chỉ làm mới code graph. Nếu nó thất
+bại, báo graph unavailable rồi fallback sang `rg`; không được giả vờ rằng graph
+hiện hành.
+
+Nếu `required_action=deep`, hoặc cần đưa note/config vào graph, chỉ chạy semantic
+rebuild khi người dùng đã cho phép dùng Gemini API:
+
+```powershell
+python content-planner-kb/scripts/update_knowledge_graph.py deep --json
+```
+
+Không mặc định rằng cron, hook hoặc scheduled task đang hoạt động. Luôn dựa
+trên kết quả `status`.
+
+## 3. Map Before Move
+
+Trước refactor kiến trúc, chạy tối thiểu một truy vấn phù hợp:
+
+```powershell
+graphify query "Home Decor production profile đi qua module nào?"
+graphify affected "produce_pipeline"
+graphify path "facebook_config" "fb_page_insights"
+graphify explain "production_manifest"
+```
+
+Sau đó:
+
+1. Ghi lại node/file liên quan và quan hệ chính.
+2. Mở trực tiếp những source file nằm trong write scope.
+3. Phân biệt cạnh `EXTRACTED` với `INFERRED`; không coi inference là bằng chứng
+   cuối cùng.
+4. Thực hiện thay đổi và chạy test hồi quy theo impact map.
+5. Sau refactor lớn, chạy lại `update` để graph phản ánh source mới.
+
+## 4. Guardrails
+
+- Không chỉnh sửa trực tiếp file trong `graphify-out/`.
+- Không commit graph, report, visualization hoặc build metadata được sinh ra.
+- Không đưa `.env`, credentials, token, database hay media vào corpus.
+- Không dùng graph để thay thế kiểm tra Git status, task ownership hoặc
+  workspace ACK.
+- Không chạy `deep` chỉ để xử lý thay đổi nhỏ; semantic extraction có thể dùng
+  API credit và gửi nội dung tài liệu tới backend đã cấu hình.

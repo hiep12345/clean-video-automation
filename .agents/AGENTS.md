@@ -102,3 +102,11 @@ Antigravity 2 chỉ báo hoàn thành sau khi đã chạy kiểm tra phù hợp 
 repository, branch, file đã sửa, kết quả test, lỗi còn lại và dirty file được
 giữ nguyên. Không trích dẫn số dòng hoặc kết luận trạng thái file nếu chưa đọc
 trực tiếp trong working tree hiện tại.
+
+Với task có ghi code/config/tài liệu:
+
+- tạo task tracker với `--git-required`, repository, branch và write scope;
+- chỉ bàn giao kết quả cho Git integrator, không tự gọi `closeout`;
+- không báo `COMPLETED` khi chưa có commit/push evidence;
+- nếu Git integrator chưa sẵn sàng, giữ task `IN_PROGRESS` và không bắt đầu một
+  write task không liên quan trong cùng repository.
