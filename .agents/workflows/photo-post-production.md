@@ -40,6 +40,12 @@ receipt-backed state transitions in that order. Direct calls to `batch_gen.py`
 or `gen_image_post.py` are implementation details and are not valid workflow
 steps.
 
+For Botanical Killers, resolve the current profile before generation:
+`BK-F01-INFOGRAPHIC-V3` is a single square `1:1` infographic. FlowKit receives
+the complete editorial prompt and renders every visible text element; do not
+add text with a compositor or create a second image variant. The legacy
+`BK-F01-SINGLE` profile is for historical/quarantined material only.
+
 The profile, not the template, controls format, aspect ratio, output name,
 text layout, platform caption limits, disclosure/CTA policy, QA evidence, and
 lifecycle constraints. A biology post also requires a hash-bound

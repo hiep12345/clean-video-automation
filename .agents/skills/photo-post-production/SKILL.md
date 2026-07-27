@@ -55,6 +55,12 @@ must fail closed.
 4. Do not call `batch_gen.py` or `gen_image_post.py` as a user-facing step; they
    are implementation modules behind the orchestrator. Do not hand-copy files
    or create alternate output folders.
+   For Botanical Killers, the active default is `BK-F01-INFOGRAPHIC-V3`: one
+   square `1:1` image (`image.png`) rendered by FlowKit from the editorial
+   prompt. The prompt owns all visible copy (category tag, headline, subline,
+   labels, and footer); code/compositor text overlays are forbidden for V3.
+   `BK-F01-SINGLE` is retained only for historical bundles and is not the
+   current BK production format.
 5. Read the evidence-derived state after every stage:
 
    ```text
