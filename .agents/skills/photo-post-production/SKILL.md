@@ -63,6 +63,7 @@ must fail closed.
    `BK-F01-SINGLE` is retained only for historical bundles and is not the
    current BK production format.
    The canonical editable template is `obsidian-kb/00-Templates/botanical-killers/photo-bk-infographic-v3.md`; other BK photo templates are archive-only.
+   For Mix Therapy, the active photo template is `obsidian-kb/00-Templates/mix-therapy/photo-mt-single.md`: square `1:1`, prompt-rendered typography, and no code/compositor overlay. The unconfigured carousel template is archive-only.
 5. Read the evidence-derived state after every stage:
 
    ```text
@@ -81,6 +82,32 @@ must fail closed.
    Drive/Notion gate. Facebook stays manual-only. After user-confirmed
    publication, use exact-ID reconciliation; do not infer publication or move
    folders by hand.
+
+## Short operator command for a quantity
+
+The user does not need to repeat implementation rules. Treat a request shaped
+like `Sản xuất <N> photo <CHANNEL>` (for example, `Sản xuất 5 photo MT`) as the
+official shorthand for a bounded sequential production run.
+
+The coordinator must expand that shorthand internally:
+
+1. Resolve the channel slug, active format, platform, and canonical template
+   from the dynamic profile.
+2. Create one unique intake draft and task identity per post.
+3. Run preflight and the single-ID orchestrator sequentially for every post.
+   Do not call `batch_gen.py` or `gen_image_post.py` directly.
+4. Do not run photo generation in parallel and do not start runtime
+   reset/archive work while the production run is active.
+5. Require independent, hash-bound QA for every image. A verdict for one image
+   never applies to the rest of the run.
+6. Stop on the first failed gate unless the user explicitly requests
+   continue-on-error.
+7. Report a per-ID table containing lifecycle state, bundle path, asset path,
+   QA score, and blocker. Only IDs with `state: READY` and `ready: true` count
+   as completed.
+
+This shorthand coordinates repeated single-post production. It does not turn
+the implementation modules into an unsupported channel-wide batch command.
 
 ## Non-negotiable policy precedence
 

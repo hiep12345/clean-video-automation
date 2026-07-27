@@ -42,12 +42,34 @@ receipt-backed state transitions in that order. Direct calls to `batch_gen.py`
 or `gen_image_post.py` are implementation details and are not valid workflow
 steps.
 
+### Short quantity trigger
+
+The operator may request a quantity with only:
+
+```text
+Sản xuất <N> photo <CHANNEL>
+```
+
+Example: `Sản xuất 5 photo MT`.
+
+Antigravity 2 must treat this as a coordinator shorthand, not ask the operator
+to restate paths, commands, QA rules, or storage rules. Expand it into a
+sequential list of unique post IDs. For each ID, create the intake draft, run
+preflight, call the single-ID orchestrator, request independent QA for the
+exact asset revision, and read lifecycle status. Do not generate in parallel,
+do not run a runtime reset/archive during the production run, and stop on the
+first failed gate unless the user explicitly requests continue-on-error.
+
+The completion report must be per ID. Only `READY` IDs count as completed;
+missing or stale evidence is a blocker, never a batch-level PASS.
+
 For Botanical Killers, resolve the current profile before generation:
 `BK-F01-INFOGRAPHIC-V3` is a single square `1:1` infographic. FlowKit receives
 the complete editorial prompt and renders every visible text element; do not
 add text with a compositor or create a second image variant. The legacy
 `BK-F01-SINGLE` profile is for historical/quarantined material only.
 The only active BK photo template is `obsidian-kb/00-Templates/botanical-killers/photo-bk-infographic-v3.md`.
+For Mix Therapy, use `obsidian-kb/00-Templates/mix-therapy/photo-mt-single.md`: square `1:1`, all visible copy rendered by the FlowKit prompt, and no compositor overlay. Do not use the archived carousel template unless a profile is explicitly enabled.
 
 The profile, not the template, controls format, aspect ratio, output name,
 text layout, platform caption limits, disclosure/CTA policy, QA evidence, and

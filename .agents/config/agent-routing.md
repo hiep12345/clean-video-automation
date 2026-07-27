@@ -56,5 +56,11 @@ assigns one primary agent per task and declares a non-overlapping write scope.
   `.agents/skills/photo-post-production/SKILL.md`. The coordinator must resolve
   the channel/format profile and run preflight before making a readiness claim
   or treating a template as policy.
+- Short requests matching `Sản xuất <N> photo <CHANNEL>` (for example,
+  `Sản xuất 5 photo MT`) route to the same photo-post workflow. The
+  coordinator expands the request internally into sequential single-ID runs,
+  independent QA per artifact, fail-closed lifecycle checks, and a per-ID
+  completion table. Do not ask the user to repeat implementation paths or
+  command flags.
 - No specialized agent is Git integrator unless the user explicitly assigns
   that role.
