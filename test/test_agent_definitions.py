@@ -241,6 +241,20 @@ class AgentDefinitionTests(unittest.TestCase):
         self.assertIn("not part of analytics collection", analytics)
         self.assertIn("explicit authorization", production)
 
+    def test_uploaded_content_workflow_is_exact_scoped_and_non_publishing(self):
+        """Published photos must be reconciled and archived with evidence."""
+        workflow = (
+            WORKFLOW_DIR / "reconcile-uploaded-content.md"
+        ).read_text(encoding="utf-8")
+        routing = ROUTING_FILE.read_text(encoding="utf-8")
+        self.assertIn("reconcile_facebook_photos.py", workflow)
+        self.assertIn("archive_uploaded_photos.py", workflow)
+        self.assertIn("normalize_legacy_photo_archive.py", workflow)
+        self.assertIn("exact content IDs", workflow)
+        self.assertIn("Facebook publishing remains manual-only", workflow)
+        self.assertIn("Do not move folders manually", workflow)
+        self.assertIn("reconcile-uploaded-content.md", routing)
+
 
 if __name__ == "__main__":
     unittest.main()

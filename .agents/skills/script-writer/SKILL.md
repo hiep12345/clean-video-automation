@@ -2,7 +2,7 @@
 name: script-writer
 description: "Viết script.md hoàn chỉnh cho full-produce: Scene Plan, Narration, Veo Prompts, Upload Metadata. Load channel formula từ Obsidian KB trước khi viết."
 risk: safe
-updated: "2026-07-04"
+updated: "2026-07-27"
 ---
 
 # Script Writer
@@ -23,6 +23,29 @@ Organism name lấy từ task file (title hoặc context section).
 ---
 
 ## Step 0: Session Context
+
+### Production-profile override (fail-closed)
+
+Đọc `config/channels/<channel-slug>.json` trước khi tự thiết kế scene.
+Nếu channel có `production_profile`, cấu hình máy là SSOT và ưu tiên hơn các
+quy tắc lựa chọn method/model/duration tổng quát bên dưới:
+
+1. Đọc đầy đủ hai file được chỉ rõ bởi `script_formula_path` và
+   `script_template_path`, tính từ `obsidian-kb/`.
+2. Sao chép nguyên vẹn `production_profile`, `generation_method` và toàn bộ
+   `scene_plan` từ template. Chỉ thay các token nội dung sáng tạo trong phần
+   prompt/context; không tự đổi role, thứ tự, lineage, model hoặc duration.
+3. Không áp dụng credit fallback khi `require_exact_model: true`. Thiếu credit
+   là trạng thái BLOCKED, không phải lý do downgrade.
+4. Trước khi bàn giao script, chạy:
+
+```bash
+python scripts/production_profile.py --channel <channel-slug> --script <script.md> --orientation <orientation>
+```
+
+Chỉ tiếp tục khi preflight trả exit code `0`. Thiếu formula/template, còn token
+chưa điền hoặc contract sai đều phải dừng trước khi gọi Flow. Channel không có
+`production_profile` tiếp tục dùng quy trình tổng quát hiện hành.
 
 **Load analytics** → `output/analytics/fb_<channel-slug>_*.json`
 
@@ -257,6 +280,7 @@ Khi video cuối cùng trượt QA L3 (Score < 6.0) hoặc trượt review của
 
 ```
 □ Gate 0: topic_dedup.py exit 0? evidence.dedup_exit_code ghi vào task file?
+□ Channel có production_profile? Đã dùng đúng formula/template được cấu hình và preflight exit 0?
 □ Context Card đã ghi vào script.md? 7 fields đầy đủ, không có placeholder `[...]`?
 □ Script: hook format match analytics? duration trong target? word count ≥ duration_target × 2.5?
 □ Script self-review (script_mode: narration): data consistent? safety zone OK? temporal coherence?

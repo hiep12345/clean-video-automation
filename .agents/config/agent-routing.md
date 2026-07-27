@@ -42,5 +42,14 @@ assigns one primary agent per task and declares a non-overlapping write scope.
 - Production is never implied by script approval; invoke
   `production-executor` only after a separate generation approval.
 - Analytics collection is not authorization to sync, archive or publish.
+- Requests such as “cập nhật số liệu Facebook mới nhất”, “refresh Facebook
+  analytics”, or “lấy số liệu các kênh hiện tại” route to `analytics-manager`
+  through `.agents/workflows/analytics-batch.md`. “Các kênh hiện tại” means
+  active channel config intersected with configured Facebook Pages; agents
+  must not ask the user to enumerate them or silently reuse stale artifacts.
+- Requests such as “đã upload”, “đã đăng”, “xử content uploaded” or “dọn bài
+  đã đăng khỏi Buffer” route through
+  `.agents/workflows/reconcile-uploaded-content.md`; exact photo reconciliation
+  must not fall back to heuristic bulk Facebook topic sync.
 - No specialized agent is Git integrator unless the user explicitly assigns
   that role.
