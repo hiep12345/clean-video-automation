@@ -16,12 +16,19 @@ SCRIPT = (
     / "scripts"
     / "update_knowledge_graph.py"
 )
-SPEC = importlib.util.spec_from_file_location("update_knowledge_graph", SCRIPT)
-GRAPHIFY = importlib.util.module_from_spec(SPEC)
-assert SPEC.loader is not None
-SPEC.loader.exec_module(GRAPHIFY)
+CONTENT_AVAILABLE = SCRIPT.is_file()
+GRAPHIFY = None
+if CONTENT_AVAILABLE:
+    SPEC = importlib.util.spec_from_file_location("update_knowledge_graph", SCRIPT)
+    GRAPHIFY = importlib.util.module_from_spec(SPEC)
+    assert SPEC.loader is not None
+    SPEC.loader.exec_module(GRAPHIFY)
 
 
+@unittest.skipUnless(
+    CONTENT_AVAILABLE,
+    "private content-planner-kb submodule is not available",
+)
 class GraphifySetupTests(unittest.TestCase):
     def test_missing_graph_is_reported_stale(self):
         with tempfile.TemporaryDirectory() as temp_dir:

@@ -9,6 +9,8 @@ ROOT = Path(__file__).parents[1]
 AGENT_DIR = ROOT / ".agents" / "agents"
 ROUTING_FILE = ROOT / ".agents" / "config" / "agent-routing.md"
 WORKFLOW_DIR = ROOT / ".agents" / "workflows"
+CONTENT_ROOT = ROOT / "content-planner-kb"
+CONTENT_AVAILABLE = (CONTENT_ROOT / "GEMINI.md").is_file()
 
 EXPECTED_TOOLS = {
     "analytics-manager": {
@@ -159,6 +161,10 @@ class AgentDefinitionTests(unittest.TestCase):
         self.assertIn("The agent that", routing)
         self.assertIn("cannot approve its publication gate", routing)
 
+    @unittest.skipUnless(
+        CONTENT_AVAILABLE,
+        "private content-planner-kb submodule is not available",
+    )
     def test_content_hot_cache_uses_current_readable_governance(self):
         """The Antigravity hot cache must stay UTF-8 and avoid stale sections."""
         hot_cache = (ROOT / "content-planner-kb" / "GEMINI.md").read_text(
@@ -201,10 +207,18 @@ class AgentDefinitionTests(unittest.TestCase):
 
     def test_required_static_references_exist(self):
         """Canonical scripts, policies and skills used by agents must exist."""
-        required = (
+        root_required = (
             ".agents/skills/video-qa-gate/SKILL.md",
             ".agents/skills/clarity-gate/SKILL.md",
             ".agents/skills/script-writer/SKILL.md",
+        )
+        missing = [path for path in root_required if not (ROOT / path).exists()]
+        self.assertEqual(missing, [])
+
+        if not CONTENT_AVAILABLE:
+            self.skipTest("private content-planner-kb submodule is not available")
+
+        content_required = (
             "content-planner-kb/GEMINI.md",
             "content-planner-kb/scripts/fb_page_insights.py",
             "content-planner-kb/scripts/notion_sync.py",
@@ -216,7 +230,7 @@ class AgentDefinitionTests(unittest.TestCase):
                 "guardrails-content-policy.md"
             ),
         )
-        missing = [path for path in required if not (ROOT / path).exists()]
+        missing = [path for path in content_required if not (ROOT / path).exists()]
         self.assertEqual(missing, [])
 
     def test_workflows_use_current_routing_and_agents(self):
