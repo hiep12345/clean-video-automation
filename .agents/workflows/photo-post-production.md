@@ -15,13 +15,25 @@ and format through `content-planner-kb/config/photo-post-profiles.json` first.
 - exact `post.md` path or post ID resolved to it
 - target platform
 
-## Entry gates
+## Local source and bundle
+
+- Editorial source: `obsidian-kb/<channel>/posts/<post-id>.md`
+- Canonical production bundle: `output/fb-posts/<channel>/<post-id>/`
+
+The two `post.md` files may have identical content, but have different roles:
+the first is editable knowledge; the second is the hash-bound production input.
+Never delete or manually copy either one to "clean up" a post.
+
+## Entry gates and state
 
 ```text
 python content-planner-kb/scripts/photo_post_preflight.py \
-  --channel <channel> --post <path-to-post.md> --platform facebook
-python content-planner-kb/scripts/photo_post_generate.py \
-  --channel <channel> --post <path-to-post.md>
+  --channel <channel> --post <draft-path> --platform facebook
+python content-planner-kb/scripts/photo_post_lifecycle.py materialize \
+  --channel <channel> --id <post-id> --json
+python content-planner-kb/scripts/batch_gen.py <channel> --id <post-id>
+python content-planner-kb/scripts/photo_post_lifecycle.py status \
+  --channel <channel> --id <post-id> --json
 ```
 
 The profile, not the template, controls format, aspect ratio, output name,
@@ -30,13 +42,18 @@ lifecycle constraints. A missing/unknown/retired format fails closed.
 
 ## Lifecycle
 
-1. Author a `post.md` with `channel` and `format_code` frontmatter.
-2. Run preflight; failure blocks generation.
-3. Generate only the exact post through the policy-aware generator.
-4. Get independent, hash-bound photo QA. Biology channels require morphology
-   and claim-source evidence; only PASS can become Ready.
-5. Use the existing Drive/Notion eligibility gate. Facebook publishing is
-   manual-only.
-6. After user-confirmed publication, reconcile exact IDs using
-   `reconcile-uploaded-content.md`; only that workflow may mark `uploaded` and
-   archive an item.
+1. Draft + preflight: `DRAFT`.
+2. Production post copied, no image: `MATERIALIZED`.
+3. Image exists but violates structural checks: `GENERATED_INVALID`.
+4. Structurally valid image, awaiting QA: `GENERATED`.
+5. Invalid/stale QA receipt: `QA_INVALID`.
+6. Hash-bound QA PASS with explicit distribution eligibility: `READY`.
+7. Publication receipt plus uploaded flag: `UPLOADED`.
+
+Only `READY` may enter Drive/Notion Buffer. The completion report must print
+per-ID `state`, `bundle_path`, `asset path`, and QA/Drive receipts. Missing
+receipt means `not performed`, never an inferred success.
+
+After user-confirmed publication, reconcile exact IDs using
+`reconcile-uploaded-content.md`; only that workflow may mark `uploaded` and
+archive an item.

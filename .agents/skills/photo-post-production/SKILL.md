@@ -38,17 +38,36 @@ must fail closed.
 
 ## Standard lifecycle
 
-1. Resolve channel + declared format.
-2. Write the creative `post.md` using the matched template.
-3. Preflight it.
-4. Generate exactly one requested artifact through
-   `photo_post_generate.py`; the profile dynamically selects aspect ratio,
-   filename, text mode, and brand.
-5. Run independent hash-bound photo QA. When profile requires biology evidence,
-   a real-world morphology reference and accessible claim sources are required.
-6. Only QA PASS can become Ready for the existing Drive/Notion gate.
-7. Facebook stays manual-only. After user-confirmed publication, use the exact
-   ID reconciliation workflow; do not infer publication or move folders by hand.
+1. Write the editorial draft at `obsidian-kb/<channel>/posts/<post-id>.md`.
+   Its only valid state is `DRAFT` after preflight passes.
+2. Materialize it into the canonical local bundle; do not hand-copy files:
+
+   ```text
+   python content-planner-kb/scripts/photo_post_lifecycle.py materialize \
+     --channel <channel> --id <post-id> --json
+   ```
+
+3. Generate only into that bundle using the bounded batch generator:
+
+   ```text
+   python content-planner-kb/scripts/batch_gen.py <channel> --id <post-id>
+   ```
+
+4. Read the evidence-derived state after every stage:
+
+   ```text
+   python content-planner-kb/scripts/photo_post_lifecycle.py status \
+     --channel <channel> --id <post-id> --json
+   ```
+
+   Never write `Ready`, `Drive eligible`, or `Notion Buffer ready` unless this
+   command returns `state: READY` and `ready: true`.
+5. Run independent hash-bound photo QA. Biology channels require a real-world
+   morphology reference and accessible claim sources. Invalid dimensions or
+   missing receipts produce `GENERATED_INVALID`/`QA_INVALID`, not `READY`.
+6. Only `READY` may enter the existing Drive/Notion gate. Facebook stays
+   manual-only. After user-confirmed publication, use exact-ID reconciliation;
+   do not infer publication or move folders by hand.
 
 ## Non-negotiable policy precedence
 
