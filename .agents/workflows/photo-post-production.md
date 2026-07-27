@@ -26,24 +26,30 @@ Never delete or manually copy either one to "clean up" a post.
 
 ## Entry gates and state
 
+The only user-facing production command is the single-ID orchestrator:
+
 ```text
-python content-planner-kb/scripts/photo_post_preflight.py \
-  --channel <channel> --post <draft-path> --platform facebook
-python content-planner-kb/scripts/photo_post_lifecycle.py materialize \
-  --channel <channel> --id <post-id> --json
-python content-planner-kb/scripts/batch_gen.py <channel> --id <post-id>
-python content-planner-kb/scripts/photo_post_lifecycle.py status \
+python content-planner-kb/scripts/photo_post_produce.py \
   --channel <channel> --id <post-id> --json
 ```
 
+Add `--execute-flowkit` only after the reference pack has been curated and the
+user has authorized the FlowKit run. The orchestrator performs preflight,
+materialization, reference validation, FlowKit request, asset validation, and
+receipt-backed state transitions in that order. Direct calls to `batch_gen.py`
+or `gen_image_post.py` are implementation details and are not valid workflow
+steps.
+
 The profile, not the template, controls format, aspect ratio, output name,
 text layout, platform caption limits, disclosure/CTA policy, QA evidence, and
-lifecycle constraints. A missing/unknown/retired format fails closed.
+lifecycle constraints. A biology post also requires a hash-bound
+`references/reference_pack.json`; an image without a FlowKit generation receipt
+is `UNVERIFIED`, never generated. A missing/unknown/retired format fails closed.
 
 ## Lifecycle
 
 1. Draft + preflight: `DRAFT`.
-2. Production post copied, no image: `MATERIALIZED`.
+2. Production post materialized into the canonical bundle, no image: `MATERIALIZED`.
 3. Image exists but violates structural checks: `GENERATED_INVALID`.
 4. Structurally valid image, awaiting QA: `GENERATED`.
 5. Invalid/stale QA receipt: `QA_INVALID`.
