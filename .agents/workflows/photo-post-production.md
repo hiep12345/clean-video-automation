@@ -53,11 +53,13 @@ is `UNVERIFIED`, never generated. A missing/unknown/retired format fails closed.
 3. Image exists but violates structural checks: `GENERATED_INVALID`.
 4. Structurally valid image, awaiting QA: `GENERATED`.
 5. Invalid/stale QA receipt: `QA_INVALID`.
-6. Hash-bound QA PASS with explicit distribution eligibility: `READY`.
-7. Publication receipt plus uploaded flag: `UPLOADED`.
+6. Quarantined asset without verified provenance: `UNVERIFIED_LEGACY`.
+7. Hash-bound QA PASS with explicit distribution eligibility: `READY`.
+8. Publication receipt plus uploaded flag: `UPLOADED`.
 
-Only `READY` may enter Drive/Notion Buffer. The completion report must print
-per-ID `state`, `bundle_path`, `asset path`, and QA/Drive receipts. Missing
+Only `READY` may enter Drive/Notion Buffer. `UNVERIFIED_LEGACY` is blocked
+from every downstream gate. The completion report must print per-ID `state`,
+`bundle_path`, `asset path`, and QA/Drive receipts. Missing
 receipt means `not performed`, never an inferred success.
 
 After user-confirmed publication, reconcile exact IDs using

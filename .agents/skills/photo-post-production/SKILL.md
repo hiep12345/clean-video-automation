@@ -68,9 +68,11 @@ must fail closed.
    morphology reference and accessible claim sources. Invalid dimensions,
    missing FlowKit provenance, or missing receipts produce
    `GENERATED_INVALID`/`QA_INVALID`, not `READY`.
-7. Only `READY` may enter the existing Drive/Notion gate. Facebook stays
-   manual-only. After user-confirmed publication, use exact-ID reconciliation;
-   do not infer publication or move folders by hand.
+7. `UNVERIFIED_LEGACY` is quarantine-only: it cannot enter QA, Drive,
+   Notion Buffer, or publication. Only `READY` may enter the existing
+   Drive/Notion gate. Facebook stays manual-only. After user-confirmed
+   publication, use exact-ID reconciliation; do not infer publication or move
+   folders by hand.
 
 ## Non-negotiable policy precedence
 
