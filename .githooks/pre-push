@@ -2,6 +2,10 @@
 set -eu
 
 repo="$(git rev-parse --show-toplevel)"
-hook_dir="$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)"
+hook_dir="${0%/*}"
+if [ "$hook_dir" = "$0" ]; then
+  hook_dir="."
+fi
+hook_dir="$(CDPATH= cd -- "$hook_dir" && pwd)"
 
 python "$hook_dir/../tools/secret_scan.py" --repo "$repo" --pre-push
