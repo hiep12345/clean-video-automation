@@ -51,5 +51,10 @@ assigns one primary agent per task and declares a non-overlapping write scope.
   đã đăng khỏi Buffer” route through
   `.agents/workflows/reconcile-uploaded-content.md`; exact photo reconciliation
   must not fall back to heuristic bulk Facebook topic sync.
+- Requests about creating, reviewing, preparing, distributing, or explaining a
+  photo post route through `.agents/workflows/photo-post-production.md` and
+  `.agents/skills/photo-post-production/SKILL.md`. The coordinator must resolve
+  the channel/format profile and run preflight before making a readiness claim
+  or treating a template as policy.
 - No specialized agent is Git integrator unless the user explicitly assigns
   that role.
