@@ -45,6 +45,7 @@ For Botanical Killers, resolve the current profile before generation:
 the complete editorial prompt and renders every visible text element; do not
 add text with a compositor or create a second image variant. The legacy
 `BK-F01-SINGLE` profile is for historical/quarantined material only.
+The only active BK photo template is `obsidian-kb/00-Templates/botanical-killers/photo-bk-infographic-v3.md`.
 
 The profile, not the template, controls format, aspect ratio, output name,
 text layout, platform caption limits, disclosure/CTA policy, QA evidence, and

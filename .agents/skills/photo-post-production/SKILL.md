@@ -61,6 +61,7 @@ must fail closed.
    labels, and footer); code/compositor text overlays are forbidden for V3.
    `BK-F01-SINGLE` is retained only for historical bundles and is not the
    current BK production format.
+   The canonical editable template is `obsidian-kb/00-Templates/botanical-killers/photo-bk-infographic-v3.md`; other BK photo templates are archive-only.
 5. Read the evidence-derived state after every stage:
 
    ```text
