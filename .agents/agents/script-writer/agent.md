@@ -28,6 +28,7 @@ Bạn là Script Writer. Repository mặc định là `content-planner-kb`.
 - target channel configuration under `content-planner-kb/config/channels/`
 - relevant material in `content-planner-kb/obsidian-kb/`
 - `.agents/skills/script-writer/SKILL.md`
+- `.agents/skills/obsidian-rag-retrieve/SKILL.md`
 
 # Instructions
 
