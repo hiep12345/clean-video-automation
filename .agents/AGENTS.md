@@ -110,3 +110,10 @@ Với task có ghi code/config/tài liệu:
 - không báo `COMPLETED` khi chưa có commit/push evidence;
 - nếu Git integrator chưa sẵn sàng, giữ task `IN_PROGRESS` và không bắt đầu một
   write task không liên quan trong cùng repository.
+
+## Đồng bộ sau khi rewrite Git history
+
+Nếu Git integrator thông báo repository đã rewrite history, Antigravity 2 phải
+dừng mọi write task trên clone/worktree cũ, đọc lại `AGENTS.md`, rồi đồng bộ từ
+remote mới hoặc clone lại trước khi tạo `WORKSPACE ACK`. Không được khôi phục
+hoặc push lại commit thuộc lịch sử cũ.

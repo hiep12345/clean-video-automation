@@ -20,6 +20,16 @@ git clone https://github.com/hiep12345/clean-video-automation.git
 cd clean-video-automation
 git submodule update --init --recursive flowkit-engine
 git submodule update --init content-planner-kb
+powershell -ExecutionPolicy Bypass -File scripts/setup_git_hooks.ps1
+```
+
+The final setup command installs the same managed Git hooks for the root
+repository and both submodules. `pre-commit` scans staged additions, while
+`pre-push` scans the commits about to be published. Verify an existing
+workspace with:
+
+```bash
+powershell -ExecutionPolicy Bypass -File scripts/setup_git_hooks.ps1 -CheckOnly
 ```
 
 `content-planner-kb` là repository riêng tư nên lệnh cuối yêu cầu tài khoản GitHub có quyền truy cập. Thư viện nhạc trong `content-planner-kb/resources/bgm/` là dữ liệu cục bộ, không được lưu trên GitHub.

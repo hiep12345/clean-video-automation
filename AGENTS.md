@@ -144,3 +144,13 @@ kiểm tra.
 - Closeout không được tự động stage toàn workspace, không dùng `git add .`, và
   không được đưa secret, runtime state, database hay generated output vào
   commit.
+
+### Git security guardrails
+
+- Mỗi workspace mới phải chạy `scripts/setup_git_hooks.ps1` để cài chung
+  `pre-commit` và `pre-push` hooks cho repo gốc cùng hai repo con.
+- Git integrator phải chạy `scripts/setup_git_hooks.ps1 -CheckOnly` trước lần
+  commit/push đầu tiên. Không dùng `--no-verify` để bỏ qua secret scan.
+- Sau khi một repository bị rewrite history, agent đang giữ clone/worktree cũ
+  phải dừng ghi và ưu tiên clone lại từ remote mới. Không merge, cherry-pick
+  hoặc push commit dựa trên lịch sử cũ nếu chưa được Git integrator xác nhận.

@@ -1,2 +1,3 @@
 # Normalize text file line endings across Windows and Linux environments.
 * text=auto
+/.githooks/* text eol=lf
