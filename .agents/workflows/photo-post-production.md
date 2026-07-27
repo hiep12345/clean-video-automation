@@ -17,12 +17,14 @@ and format through `content-planner-kb/config/photo-post-profiles.json` first.
 
 ## Local source and bundle
 
-- Editorial source: `obsidian-kb/<channel>/posts/<post-id>.md`
+- Unvalidated intake source: `content-planner-kb/intake/photo-posts/<channel>/<post-id>.md`
+- Curated knowledge destination (after validation): `obsidian-kb/<channel>/posts/<post-id>.md`
 - Canonical production bundle: `output/fb-posts/<channel>/<post-id>/`
 
-The two `post.md` files may have identical content, but have different roles:
-the first is editable knowledge; the second is the hash-bound production input.
-Never delete or manually copy either one to "clean up" a post.
+The intake draft and bundle `post.md` have different roles: the intake file is
+unvalidated working input; the bundle copy is hash-bound production input.
+Obsidian notes are promoted only after the validation gates pass. Never use
+Obsidian as an intake folder or manually copy drafts into the vault.
 
 ## Entry gates and state
 

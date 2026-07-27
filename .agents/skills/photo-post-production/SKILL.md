@@ -38,8 +38,9 @@ must fail closed.
 
 ## Standard lifecycle
 
-1. Write the editorial draft at `obsidian-kb/<channel>/posts/<post-id>.md`.
-   Its only valid state is `DRAFT` after preflight passes.
+1. Write the unvalidated editorial draft at `content-planner-kb/intake/photo-posts/<channel>/<post-id>.md`.
+   Its only valid state is `DRAFT` after preflight passes. Never write drafts
+   into `obsidian-kb/`; that vault is curated, validated knowledge.
 2. Run the single production orchestrator. It owns materialization, reference
    validation, FlowKit generation, hash-bound generation receipt, and state:
 
