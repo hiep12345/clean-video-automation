@@ -114,14 +114,38 @@ khác mà chưa có bàn giao rõ ràng.
 - Facebook content publishing hiện ở chế độ `manual-only`: mọi agent và
   automation bị cấm gọi API upload/publish Reel hoặc Post. Chỉ các tác vụ đọc
   dữ liệu như topic sync và insights được phép dùng Facebook Page Token.
-- Trong giao tiếp với người dùng, luôn gọi `/openapi.json` là “schema API nội bộ
-  của FlowKit” hoặc “đặc tả endpoint local của FlowKit”; không dùng “OpenAPI”
-  đứng riêng.
-- Khi nhắc đến endpoint này, phải phân biệt rõ đây không phải OpenAI API: việc
-  đọc endpoint local không gọi nhà cung cấp AI và không tiêu credit.
-- Giữ nguyên tên kỹ thuật `/openapi.json` trong code, cấu hình và tài liệu kỹ
-  thuật cần tính tương thích; quy ước trên chỉ chuẩn hóa cách diễn đạt với người
-  dùng.
+
+### Thuật ngữ kỹ thuật và phân loại chi phí
+
+Các quy tắc sau áp dụng cho mọi agent, tool, API, connector, provider và
+automation khi giao tiếp với người dùng:
+
+- Ở lần nhắc đầu tiên, phải nêu rõ hệ thống hoặc chủ sở hữu cùng loại artifact
+  hay hành động đang nói đến; không dùng một tên chuẩn, sản phẩm hoặc viết tắt
+  đứng riêng khi tên đó có thể bị hiểu là một dịch vụ khác.
+- Phải mở rộng hoặc phân biệt rõ các tên gần giống nhau, đặc biệt khi một tên là
+  tiêu chuẩn kỹ thuật còn tên kia là nhà cung cấp, sản phẩm hoặc dịch vụ có thể
+  tính phí.
+- Trước khi mô tả chi phí, phải phân loại ranh giới thực thi thành một trong
+  bốn nhóm: đọc cục bộ không thay đổi trạng thái; đọc từ hệ thống bên ngoài;
+  ghi hoặc gây tác dụng phụ lên hệ thống bên ngoài; tạo sinh có thể tính phí
+  hoặc tiêu credit.
+- Không suy luận chi phí chỉ từ tên tool, API, connector, provider hay endpoint.
+  Báo cáo phải nêu lệnh gọi hoặc tác dụng phụ thực tế đã quan sát. Chỉ được
+  khẳng định “không phát sinh chi phí” khi đã xác minh không có lệnh gọi tính
+  phí, không có tạo sinh tiêu credit và không có tác dụng phụ có tính phí; nếu
+  chưa đủ bằng chứng, phải ghi rõ chi phí chưa được xác định.
+- Phải phân biệt tên định danh kỹ thuật dùng trong code, cấu hình, log hoặc giao
+  thức với nhãn giải thích cho người dùng. Giữ nguyên định danh kỹ thuật khi cần
+  tương thích; chuẩn hóa nhãn diễn giải thay vì đổi định danh theo từng trường
+  hợp.
+- Báo cáo phải dẫn bằng tác động thực tế và trạng thái chi phí, sau đó mới nêu
+  thuật ngữ hoặc chi tiết kỹ thuật cần thiết.
+
+Ví dụ không mang tính quy phạm: `/openapi.json` là định danh kỹ thuật của schema
+API nội bộ do FlowKit phục vụ tại endpoint local, không phải OpenAI API. Chỉ khi
+đã xác minh thao tác thực tế là đọc cục bộ và không gọi nhà cung cấp AI mới được
+báo rằng thao tác đó không tiêu credit.
 
 ## 6. Kiểm tra và bàn giao
 
