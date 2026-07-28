@@ -83,9 +83,10 @@ is `UNVERIFIED`, never generated. A missing/unknown/retired format fails closed.
 2. Production post materialized into the canonical bundle, no image: `MATERIALIZED`.
 3. Image exists but violates structural checks: `GENERATED_INVALID`.
 4. Structurally valid image, awaiting QA: `GENERATED`.
-5. Invalid/stale QA receipt: `QA_INVALID`.
-6. Quarantined asset without verified provenance: `UNVERIFIED_LEGACY`.
-7. Hash-bound QA PASS with explicit distribution eligibility: `READY`.
+5. Valid schema-v5 independent QA, awaiting coordinator: `QA_REVIEWED`.
+6. Invalid/stale QA or parent receipt: `QA_INVALID`.
+7. Quarantined asset without verified provenance: `UNVERIFIED_LEGACY`.
+8. Hash-bound QA plus independent coordinator acceptance: `READY`.
 
 For every generated ID, the coordinator creates a `PENDING` task assigned to
 `production-executor` and invokes that sub-agent. The specialist, not the
@@ -116,15 +117,29 @@ python content-planner-kb/scripts/team_preflight.py \
 ```
 
 The production command cannot write a PASS; the review command is the only
-supported writer of `review_results.json`. A failed preflight/claim or missing
-specialist blocks the batch; the parent may not impersonate either role.
+supported writer of `review_results.json`. The review command does not accept
+`--score`: schema-v5 computes it from fixed checks. A failed preflight/claim or
+missing specialist blocks the batch; the parent may not impersonate either
+role.
 
-`READY` requires all of the following at the same revision: real reference
-evidence where configured, FlowKit media IDs, schema-v2 generation receipt,
-production task/trajectory binding, schema-v4 QA receipt, distinct dependent
-QA task/trajectory binding, and tracker-bound receipt hashes. A plausible
-receipt without those bindings is `GENERATED_INVALID` or `QA_INVALID`.
-8. Publication receipt plus uploaded flag: `UPLOADED`.
+After QA reaches `QA_REVIEWED`, the coordinator opens the exact generated
+artifact and every exact local biology reference with `view_file`, records
+specific findings and zero critical defects, and runs:
+
+```text
+python content-planner-kb/scripts/photo_post_accept.py \
+  --channel <channel> --id <post-id> --decision ACCEPT \
+  --evidence-file <parent-evidence.json> --json
+```
+
+`READY` requires all of the following at the same revision: schema-v2
+real-photo reference evidence where configured, FlowKit media IDs, schema-v2
+generation receipt, production task/trajectory binding, schema-v5
+machine-scored QA receipt, distinct dependent QA task/trajectory binding,
+tracker-bound receipt hashes, and a parent acceptance hash-bound by a third
+trajectory. A plausible receipt without those bindings is
+`GENERATED_INVALID`, `QA_REVIEWED`, or `QA_INVALID`.
+9. Publication receipt plus uploaded flag: `UPLOADED`.
 
 Only `READY` may enter Drive/Notion Buffer. `UNVERIFIED_LEGACY` is blocked
 from every downstream gate. The completion report must print per-ID `state`,

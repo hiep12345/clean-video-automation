@@ -107,6 +107,12 @@ tuyên bố đã dùng specialist.
 - Chỉ artifact có `drive_buffer_eligible: true` trong QA gate receipt hợp lệ
   mới được xem là đủ điều kiện cho bước Drive hoặc Notion Buffer. Receipt
   không tự cấp quyền chạy upload/sync; quyền bên ngoài vẫn theo lệnh người dùng.
+- Với photo post, QA receipt schema-v5 chỉ tạo trạng thái `QA_REVIEWED` và luôn
+  giữ `drive_buffer_eligible: false`. Điểm QA do code tính; agent không được
+  truyền điểm. Chỉ coordinator acceptance ở trajectory thứ ba, đã mở đúng
+  artifact/reference bằng `view_file` và khớp hash, mới chuyển `READY` và cấp
+  eligibility hiệu lực. Reference sinh học schema-v1, ảnh schematic hoặc file
+  không được tạo bởi `photo_reference_import.py` đều bị quarantine.
 - Không chạy upload hoặc sync để “thử” một artifact chưa qua gate. Dry-run
   không thay thế QA.
 

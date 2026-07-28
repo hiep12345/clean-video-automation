@@ -31,7 +31,11 @@ assigns one primary agent per task and declares a non-overlapping write scope.
   `<post-id>-production` assigned to `production-executor`, then
   `<post-id>-qa` assigned to `qa-reviewer` with an exact dependency on the
   production task. Invoke a new trajectory for each task. The parent may
-  coordinate these tasks but may not run either receipt-writing command itself.
+  coordinate these tasks but may not run either specialist receipt-writing
+  command itself. After QA reaches `QA_REVIEWED`, the parent opens the exact
+  artifact and references itself and writes only the separate coordinator
+  acceptance through `photo_post_accept.py`; this second key is required for
+  `READY`.
 - Do not invoke a specialist for a trivial task or claim delegation when the
   runtime did not expose the invocation tool.
 - Parent fallback is allowed only for Tier 0/1. If the runtime cannot invoke a
@@ -55,6 +59,10 @@ assigns one primary agent per task and declares a non-overlapping write scope.
 - The parent independently opens and checks at least one PASS-critical source
   before claiming a cross-check. Without a parent tool receipt, report
   `parent_cross_check: not performed`.
+- Photo QA scores are machine-computed; neither reviewer nor parent may supply
+  or override a numeric score. `read_url_content` cannot satisfy morphology
+  visual evidence. Biology references must be schema-v2 imports and both QA
+  and parent must use `view_file` on the exact hash-bound local files.
 - Production is never implied by script approval; invoke
   `production-executor` only after a separate generation approval.
 - Analytics collection is not authorization to sync, archive or publish.

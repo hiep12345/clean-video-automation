@@ -99,6 +99,9 @@
         "qa-reviewer"
       ],
       "distinct_trajectories": true,
+      "machine_computed_qa_score": true,
+      "parent_acceptance_required": true,
+      "reference_pack_schema": 2,
       "stop_on_first_failed_gate": true
     },
     "code-change": {

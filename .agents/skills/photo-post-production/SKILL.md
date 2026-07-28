@@ -1,8 +1,6 @@
 ---
 name: photo-post-production
 description: "Khung xương chuẩn cho create/review/distribute photo post, nạp policy động theo channel và format."
-risk: safe
-updated: "2026-07-27"
 ---
 
 # Photo-post production
@@ -52,7 +50,11 @@ must fail closed.
 3. For an explicitly authorized FlowKit run, add `--execute-flowkit`. The
    command uploads only curated reference files recorded in the bundle's
    `references/reference_pack.json`, then sends their FlowKit media IDs with
-   the prompt. It never discovers or downloads references implicitly.
+   the prompt. Biology references must be imported first through
+   `photo_reference_import.py`; manual pack entries, schema-v1 packs,
+   schematics, low-resolution images, and source/file hash mismatches fail
+   closed. The importer binds the source page, direct image URL, identity,
+   depicted view, exact downloaded bytes and SHA-256.
 4. Do not call `batch_gen.py` or `gen_image_post.py` as a user-facing step; they
    are implementation modules behind the orchestrator. Do not hand-copy files
    or create alternate output folders.
@@ -82,11 +84,20 @@ must fail closed.
    start its own task with `team_preflight.py --claim`, exact role, current
    trajectory and non-overlapping resource keys. Pass the production task to
    `photo_post_produce.py --production-task-id`; create the final review only
-   with `photo_post_review.py --qa-task-id`. Direct `photo_qa.py` writes,
+   with `photo_post_review.py --qa-task-id`. Do not pass a numeric score:
+   schema-v5 computes it from fixed checklist weights and caps any critical
+   failure at 5.9. Morphology visual evidence requires `view_file` on the exact
+   local artifact and schema-v2 reference, matching hashes, and a separate
+   observation for every declared visual trait. Direct `photo_qa.py` writes,
    hand-authored PASS receipts, reused trajectories, and receipt hashes not
    bound in the tracker fail closed. A failed tracker/preflight command blocks
    the run; the parent may not substitute for either specialist.
-7. `UNVERIFIED_LEGACY` is quarantine-only: it cannot enter QA, Drive,
+7. A valid QA receipt produces `QA_REVIEWED`, not `READY`, and cannot grant
+   Drive/Buffer eligibility. The coordinator must independently open the exact
+   artifact and references from a trajectory different from producer and QA,
+   then run `photo_post_accept.py`. Only a hash-bound ACCEPT receipt with zero
+   critical defects moves the lifecycle to `READY`.
+8. `UNVERIFIED_LEGACY` is quarantine-only: it cannot enter QA, Drive,
    Notion Buffer, or publication. Only `READY` may enter the existing
    Drive/Notion gate. Facebook stays manual-only. After user-confirmed
    publication, use exact-ID reconciliation; do not infer publication or move
@@ -107,7 +118,8 @@ The coordinator must expand that shorthand internally:
    Do not call `batch_gen.py` or `gen_image_post.py` directly.
 4. Do not run photo generation in parallel and do not start runtime
    reset/archive work while the production run is active.
-5. Require independent, hash-bound QA for every image. A verdict for one image
+5. Require independent, hash-bound QA and coordinator acceptance for every
+   image. A verdict or acceptance for one image
    never applies to the rest of the run.
 6. Stop on the first failed gate unless the user explicitly requests
    continue-on-error.

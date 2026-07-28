@@ -60,6 +60,22 @@ python content-planner-kb/scripts/photo_post_produce.py \
   --production-task-id <production-task-id> --json
 ```
 
+For biology channels, production may use only a schema-v2 reference pack
+created by `photo_reference_import.py`. Manual reference-pack entries,
+schematics, low-resolution images, page URLs presented as direct assets, and
+legacy schema-v1 packs are invalid. The importer preserves the exact downloaded
+bytes and binds source page, direct image URL, identity, depicted view,
+dimensions, media type, acquisition receipt and SHA-256 before FlowKit upload.
+
+```text
+python content-planner-kb/scripts/photo_reference_import.py \
+  --bundle <bundle-path> --channel <channel> --file <reference.jpg> \
+  --source-page-url <page-url> --source-asset-url <direct-image-url> \
+  --scientific-name <taxon> --depicted-view <view> \
+  --trait <visible-trait-1> --trait <visible-trait-2> \
+  --usage-basis <license-or-authorized-basis>
+```
+
 The command binds `ANTIGRAVITY_TRAJECTORY_ID` to the production task, writes a
 hash-bound FlowKit generation receipt, binds that receipt hash in
 `task_agent.db`, and completes the production task. Missing trajectory, wrong
