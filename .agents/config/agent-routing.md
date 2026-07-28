@@ -12,13 +12,19 @@ assigns one primary agent per task and declares a non-overlapping write scope.
 | `script-writer` | Script, prompts and metadata | `content-planner-kb` | One designated `script.md` | Cannot publish or invent unsupported facts |
 | `system-developer` | Backend/API/database changes | Explicit task repository | Declared source and tests | External services and production data require approval |
 | `web-developer` | UI/dashboard changes | Explicit task repository | Declared UI folder and tests | Package changes and deployment require approval |
+| `repository-integrator` | Git review and closeout | Explicit task repository | Exact tracker `git_write_scope` only | Feature-branch commit/push only; cannot merge or edit source |
 
 ## Coordinator contract
 
 - Antigravity 2 parent is the Strategic Coordinator and remains accountable
   for task ownership, decomposition, synthesis and final evidence review.
+- `.agents/config/team-manifest.yaml` is the machine-readable role and risk-tier
+  registry. Markdown instructions may add context but may not weaken it.
 - For a complex task, read this table first and call `invoke_subagent` with the
   exact agent name, bounded objective, task mode and non-overlapping scope.
+- Every Tier 2 or Tier 3 specialist must pass `team_preflight.py --claim`
+  before its first task action. A missing task, role mismatch, reused
+  trajectory, incomplete dependency, or resource conflict is a hard stop.
 - Use independent roles for implementation and verification. The agent that
   generates or edits an artifact cannot approve its publication gate.
 - For photo posts, the parent creates two tracker tasks per ID:
@@ -28,11 +34,16 @@ assigns one primary agent per task and declares a non-overlapping write scope.
   coordinate these tasks but may not run either receipt-writing command itself.
 - Do not invoke a specialist for a trivial task or claim delegation when the
   runtime did not expose the invocation tool.
+- Parent fallback is allowed only for Tier 0/1. If the runtime cannot invoke a
+  required Tier 2/3 specialist, mark the task `BLOCKED`; the parent may not
+  impersonate production, QA, development, or integration trajectories.
 
 ## Routing rules
 
 - Code implementation: `system-developer` or `web-developer`.
 - Code verification: `qa-engineer`.
+- Git review, feature-branch commit/push and tracker closeout:
+  `repository-integrator`. This role cannot modify implementation files.
 - Script and media verification: `qa-reviewer`.
 - Scientific claim verification belongs to `qa-reviewer`, using accessible
   primary or authoritative sources opened with `read_url_content` and
@@ -67,5 +78,5 @@ assigns one primary agent per task and declares a non-overlapping write scope.
   independent QA per artifact, fail-closed lifecycle checks, and a per-ID
   completion table. Do not ask the user to repeat implementation paths or
   command flags.
-- No specialized agent is Git integrator unless the user explicitly assigns
-  that role.
+- No specialist has Git authority except a task explicitly assigned to
+  `repository-integrator` with `git_required=true`. Merge remains user-only.

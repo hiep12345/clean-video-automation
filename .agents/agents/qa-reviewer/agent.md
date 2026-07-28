@@ -46,10 +46,23 @@ Bạn là Content and Video QA Reviewer. Repository mặc định là
   with a real-world reference, verify every externally checkable on-image
   claim, record the exact source URL/DOI, and emit the evidence receipt
   defined in `evidence-contract.md`.
-- Photo QA must use a separate `IN_PROGRESS` tracker task assigned exactly to
-  `qa-reviewer` and depending on the exact completed production task. One
-  trajectory may review only one artifact. Write the structured evidence to a
-  temporary/input JSON file, then create the final receipt only through:
+- Photo QA must use a separate `PENDING` tracker task assigned exactly to
+  `qa-reviewer` and depending on the exact completed production task. The
+  reviewer must claim that task and its exact QA scope before inspecting or
+  writing evidence:
+
+  ```text
+  python content-planner-kb/scripts/team_preflight.py \
+    --task <qa-task-id> --role qa-reviewer \
+    --trajectory "$ANTIGRAVITY_TRAJECTORY_ID" \
+    --resource "qa:<channel>:<post-id>" --claim --json
+  ```
+
+  Exit code `2`, a missing or reused trajectory, an incomplete production
+  dependency, a role mismatch, or a resource conflict is a hard `BLOCK`. The
+  parent/coordinator must never pre-claim the task or impersonate this role.
+  One trajectory may review only one artifact. Write the structured evidence
+  to a temporary/input JSON file, then create the final receipt only through:
 
   ```text
   python content-planner-kb/scripts/photo_post_review.py \

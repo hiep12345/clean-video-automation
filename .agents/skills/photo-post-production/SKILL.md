@@ -78,11 +78,14 @@ must fail closed.
    missing FlowKit provenance, or missing receipts produce
    `GENERATED_INVALID`/`QA_INVALID`, not `READY`.
    Production and QA are separate tracker tasks and separate Antigravity
-   trajectories. Pass the production task to
+   trajectories. Create both tasks as `PENDING`; each specialist must atomically
+   start its own task with `team_preflight.py --claim`, exact role, current
+   trajectory and non-overlapping resource keys. Pass the production task to
    `photo_post_produce.py --production-task-id`; create the final review only
    with `photo_post_review.py --qa-task-id`. Direct `photo_qa.py` writes,
    hand-authored PASS receipts, reused trajectories, and receipt hashes not
-   bound in the tracker fail closed.
+   bound in the tracker fail closed. A failed tracker/preflight command blocks
+   the run; the parent may not substitute for either specialist.
 7. `UNVERIFIED_LEGACY` is quarantine-only: it cannot enter QA, Drive,
    Notion Buffer, or publication. Only `READY` may enter the existing
    Drive/Notion gate. Facebook stays manual-only. After user-confirmed

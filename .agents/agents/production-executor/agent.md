@@ -36,9 +36,23 @@ Do not start generation until all items are known:
 
 ## Photo-post mode
 
-For a photo post, the parent must supply an `IN_PROGRESS` tracker task assigned
-exactly to `production-executor`. One trajectory may own only one production
-task. Run only:
+For a photo post, the parent must supply a `PENDING` tracker task assigned
+exactly to `production-executor`. Before generation, the executor must claim
+the task and exact artifact scope itself:
+
+```text
+python content-planner-kb/scripts/team_preflight.py \
+  --task <production-task-id> --role production-executor \
+  --trajectory "$ANTIGRAVITY_TRAJECTORY_ID" \
+  --resource "workflow:photo-post" \
+  --resource "artifact:<channel>:<post-id>" \
+  --resource "path:output/fb-posts/<channel>/<post-id>" --claim --json
+```
+
+Exit code `2`, a missing trajectory, a role mismatch, an incomplete dependency,
+or a resource conflict is a hard `BLOCK`. The parent/coordinator must never
+pre-claim the task or impersonate this role. One trajectory may own only one
+production task. After preflight passes, run only:
 
 ```text
 python content-planner-kb/scripts/photo_post_produce.py \

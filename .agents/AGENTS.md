@@ -18,6 +18,28 @@ ghi một `WORKSPACE ACK` theo mẫu trong `AGENTS.md` ở root. ACK phải nêu
 Không tự suy đoán Git integrator. Nếu Codex hoặc agent khác đang giữ vai trò
 này, Antigravity 2 không được switch branch, stage, commit, rebase hay push.
 
+## Claim và team preflight bắt buộc
+
+`.agents/config/team-manifest.yaml` là registry máy đọc được cho role và risk
+tier. Trước hành động đầu tiên của specialist Tier 2/3, specialist phải chạy:
+
+```text
+python content-planner-kb/scripts/team_preflight.py \
+  --task <task-id> --role <role> \
+  --trajectory <ANTIGRAVITY_TRAJECTORY_ID> \
+  --resource <exact-resource-key> --claim --json
+```
+
+Preflight tự kiểm tra assignment, dependency, trajectory reuse và resource
+conflict, rồi chuyển task sang `IN_PROGRESS` bằng một transaction nguyên tử.
+Không được cập nhật `IN_PROGRESS` thủ công để thay thế claim. Lỗi CLI, task
+không tồn tại, role sai, dependency chưa xong hoặc claim thất bại đều là hard
+stop; parent không được tiếp tục bằng báo cáo thủ công.
+
+Specialist phải heartbeat cho task dài và giải phóng claim khi handoff. Trạng
+thái terminal tự giải phóng lock. Không kết nối SQLite trực tiếp; dùng
+`task_manager.py`.
+
 ## Vai trò điều phối chiến lược
 
 Antigravity 2 là **Strategic Coordinator** của phiên Antigravity, không phải
@@ -39,8 +61,10 @@ table, truyền mục tiêu hữu hạn, input đã biết, repository, task mod
 scope không chồng lấn. Parent không được chuyển toàn bộ trách nhiệm nghiệm thu
 cho specialist. Không delegate task nhỏ chỉ để hình thức.
 
-Nếu runtime không có `invoke_subagent`, parent phải nói rõ giới hạn này và tự
-thực hiện theo cùng ranh giới vai trò; không được tuyên bố đã dùng specialist.
+Nếu runtime không có `invoke_subagent`, parent chỉ được tự thực hiện task Tier
+0/1. Task Tier 2/3 cần production, QA độc lập, developer, software QA hoặc Git
+integration phải chuyển `BLOCKED`; parent không được tự đóng nhiều vai hoặc
+tuyên bố đã dùng specialist.
 
 ## Phối hợp
 
@@ -106,10 +130,17 @@ trực tiếp trong working tree hiện tại.
 Với task có ghi code/config/tài liệu:
 
 - tạo task tracker với `--git-required`, repository, branch và write scope;
-- chỉ bàn giao kết quả cho Git integrator, không tự gọi `closeout`;
+- developer bàn giao kết quả cho `qa-engineer`, sau đó
+  `repository-integrator`; không agent nào tự kiểm tra và tự closeout thay đổi
+  của chính mình;
+- chỉ task gán chính xác cho `repository-integrator` mới có quyền stage, commit,
+  push feature branch và gọi `closeout`;
 - không báo `COMPLETED` khi chưa có commit/push evidence;
-- nếu Git integrator chưa sẵn sàng, giữ task `IN_PROGRESS` và không bắt đầu một
-  write task không liên quan trong cùng repository.
+- nếu thiếu role bắt buộc, giữ task `BLOCKED`; không bắt đầu write task chồng
+  scope trong cùng repository.
+
+`repository-integrator` không được sửa source, bypass hook, merge, rebase,
+force-push hoặc dùng `git add .`. Merge luôn cần lệnh riêng của người dùng.
 
 ## Đồng bộ sau khi rewrite Git history
 

@@ -87,14 +87,37 @@ is `UNVERIFIED`, never generated. A missing/unknown/retired format fails closed.
 6. Quarantined asset without verified provenance: `UNVERIFIED_LEGACY`.
 7. Hash-bound QA PASS with explicit distribution eligibility: `READY`.
 
-For every generated ID, the coordinator must create and start a task assigned
-to `production-executor`, invoke that sub-agent, and pass the exact task ID to
-`photo_post_produce.py --execute-flowkit --production-task-id ...`. After the
-generation task completes, create a dependent QA task assigned to
-`qa-reviewer`, invoke a fresh sub-agent trajectory, and use
-`photo_post_review.py --qa-task-id ...`. The production command cannot write a
-PASS; the review command is the only supported writer of
-`review_results.json`.
+For every generated ID, the coordinator creates a `PENDING` task assigned to
+`production-executor` and invokes that sub-agent. The specialist, not the
+parent, atomically starts the task:
+
+```text
+python content-planner-kb/scripts/team_preflight.py \
+  --task <production-task-id> --role production-executor \
+  --trajectory <current-trajectory> \
+  --resource workflow:photo-post \
+  --resource artifact:<channel>:<post-id> \
+  --resource path:output/fb-posts/<channel>/<post-id> \
+  --claim --json
+```
+
+Only after this passes may it call
+`photo_post_produce.py --execute-flowkit --production-task-id ...`.
+After generation completes, the coordinator creates a dependent `PENDING` QA
+task assigned to `qa-reviewer` and invokes a fresh trajectory. That specialist
+must claim a distinct QA resource before using
+`photo_post_review.py --qa-task-id ...`:
+
+```text
+python content-planner-kb/scripts/team_preflight.py \
+  --task <qa-task-id> --role qa-reviewer \
+  --trajectory <fresh-qa-trajectory> \
+  --resource qa:<channel>:<post-id> --claim --json
+```
+
+The production command cannot write a PASS; the review command is the only
+supported writer of `review_results.json`. A failed preflight/claim or missing
+specialist blocks the batch; the parent may not impersonate either role.
 
 `READY` requires all of the following at the same revision: real reference
 evidence where configured, FlowKit media IDs, schema-v2 generation receipt,

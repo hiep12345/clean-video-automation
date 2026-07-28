@@ -50,9 +50,38 @@ erDiagram
         TEXT key PK
         TEXT value
     }
+    task_claim {
+        INTEGER id PK
+        TEXT task_id FK
+        TEXT owner_role
+        TEXT trajectory_id UK
+        TEXT acquired_at
+        TEXT heartbeat_at
+        TEXT expires_at
+        TEXT released_at
+    }
+    resource_lock {
+        TEXT resource_key PK
+        TEXT task_id FK
+        INTEGER claim_id FK
+        TEXT owner_role
+        TEXT trajectory_id
+        TEXT expires_at
+    }
+    task_handoff {
+        INTEGER id PK
+        TEXT task_id FK
+        TEXT from_role
+        TEXT to_role
+        TEXT reason
+        TEXT status
+    }
 
     task ||--o{ task_dependency : "has"
     task ||--o{ task_evidence : "records"
+    task ||--o{ task_claim : "claimed by"
+    task_claim ||--o{ resource_lock : "owns"
+    task ||--o{ task_handoff : "hands off"
 ```
 
 ### Các ràng buộc quan trọng:
@@ -130,6 +159,44 @@ Sử dụng trực tiếp CLI của `task_manager.py` khi cần debug thủ côn
     ```bash
     python content-planner-kb/scripts/task_manager.py prune --days 60
     ```
+
+## Antigravity Team Coordination
+
+Tier 2/3 specialists do not start by calling `update --status IN_PROGRESS`.
+They must claim atomically through the machine-readable team preflight:
+
+```powershell
+python content-planner-kb/scripts/team_preflight.py `
+  --task <task-id> --role <assigned-role> `
+  --trajectory <current-trajectory-id> `
+  --resource <exact-resource-key> --claim --json
+```
+
+Long-running tasks renew their lease:
+
+```powershell
+python content-planner-kb/scripts/task_manager.py heartbeat `
+  --id <task-id> --trajectory <trajectory-id> --json
+```
+
+Before assigning overlapping work, inspect locks:
+
+```powershell
+python content-planner-kb/scripts/task_manager.py conflicts `
+  --resource <resource-key> --json
+```
+
+When a role cannot continue, hand off instead of editing outside its boundary:
+
+```powershell
+python content-planner-kb/scripts/task_manager.py handoff `
+  --id <task-id> --from-role <role-a> --to-role <role-b> `
+  --reason "<bounded reason>" --evidence "<artifact/test evidence>" --json
+```
+
+Claims use a 15-minute lease by default. Trajectory IDs are immutable and
+cannot be reused after release. Terminal task states release active locks.
+Any non-zero tracker/preflight result is a hard stop, not a warning.
 
 ## Git Closeout Gate
 
