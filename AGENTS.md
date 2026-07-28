@@ -114,6 +114,14 @@ khác mà chưa có bàn giao rõ ràng.
 - Facebook content publishing hiện ở chế độ `manual-only`: mọi agent và
   automation bị cấm gọi API upload/publish Reel hoặc Post. Chỉ các tác vụ đọc
   dữ liệu như topic sync và insights được phép dùng Facebook Page Token.
+- Trong giao tiếp với người dùng, luôn gọi `/openapi.json` là “schema API nội bộ
+  của FlowKit” hoặc “đặc tả endpoint local của FlowKit”; không dùng “OpenAPI”
+  đứng riêng.
+- Khi nhắc đến endpoint này, phải phân biệt rõ đây không phải OpenAI API: việc
+  đọc endpoint local không gọi nhà cung cấp AI và không tiêu credit.
+- Giữ nguyên tên kỹ thuật `/openapi.json` trong code, cấu hình và tài liệu kỹ
+  thuật cần tính tương thích; quy ước trên chỉ chuẩn hóa cách diễn đạt với người
+  dùng.
 
 ## 6. Kiểm tra và bàn giao
 
