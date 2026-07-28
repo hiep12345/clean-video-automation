@@ -82,6 +82,32 @@ verdict: MATCH | NEEDS FIX | UNVERIFIED
 If `reference_opened` is not true, morphology is `UNVERIFIED`. Do not infer a
 reference comparison from the generated artifact alone.
 
+## Runtime provenance receipt
+
+Photo QA is valid only when the final receipt is created by
+`photo_post_review.py`. The receipt must contain:
+
+```text
+RUNTIME QA PROVENANCE
+qa_task_id: <tracker task assigned to qa-reviewer>
+reviewer_role: qa-reviewer
+reviewer_trajectory_id: <current ANTIGRAVITY_TRAJECTORY_ID>
+production_task_id: <exact completed production dependency>
+producer_trajectory_id: <trajectory from generation receipt>
+generation_receipt_sha256: <reviewed generation receipt hash>
+```
+
+The QA task and production task must differ. Their trajectories must differ,
+and a trajectory cannot be reused for another artifact task. The production
+receipt hash must already be bound to the production task. After QA, the
+review receipt hash is bound to the QA task before that task is completed.
+Missing or conflicting tracker evidence is `BLOCK`, even when the JSON schema,
+score, and asset hashes look valid.
+
+For `photo_post_review.py`, place the claim receipts, morphology receipt,
+confirmations, and exact visual/text observations in the supplied evidence
+JSON. Do not replace structured claim receipts with a list of URLs.
+
 ## Report gate
 
 End every report with:

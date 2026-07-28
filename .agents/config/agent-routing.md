@@ -21,6 +21,11 @@ assigns one primary agent per task and declares a non-overlapping write scope.
   exact agent name, bounded objective, task mode and non-overlapping scope.
 - Use independent roles for implementation and verification. The agent that
   generates or edits an artifact cannot approve its publication gate.
+- For photo posts, the parent creates two tracker tasks per ID:
+  `<post-id>-production` assigned to `production-executor`, then
+  `<post-id>-qa` assigned to `qa-reviewer` with an exact dependency on the
+  production task. Invoke a new trajectory for each task. The parent may
+  coordinate these tasks but may not run either receipt-writing command itself.
 - Do not invoke a specialist for a trivial task or claim delegation when the
   runtime did not expose the invocation tool.
 

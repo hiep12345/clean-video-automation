@@ -77,6 +77,12 @@ must fail closed.
    morphology reference and accessible claim sources. Invalid dimensions,
    missing FlowKit provenance, or missing receipts produce
    `GENERATED_INVALID`/`QA_INVALID`, not `READY`.
+   Production and QA are separate tracker tasks and separate Antigravity
+   trajectories. Pass the production task to
+   `photo_post_produce.py --production-task-id`; create the final review only
+   with `photo_post_review.py --qa-task-id`. Direct `photo_qa.py` writes,
+   hand-authored PASS receipts, reused trajectories, and receipt hashes not
+   bound in the tracker fail closed.
 7. `UNVERIFIED_LEGACY` is quarantine-only: it cannot enter QA, Drive,
    Notion Buffer, or publication. Only `READY` may enter the existing
    Drive/Notion gate. Facebook stays manual-only. After user-confirmed

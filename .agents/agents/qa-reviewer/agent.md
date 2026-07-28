@@ -46,6 +46,21 @@ Bạn là Content and Video QA Reviewer. Repository mặc định là
   with a real-world reference, verify every externally checkable on-image
   claim, record the exact source URL/DOI, and emit the evidence receipt
   defined in `evidence-contract.md`.
+- Photo QA must use a separate `IN_PROGRESS` tracker task assigned exactly to
+  `qa-reviewer` and depending on the exact completed production task. One
+  trajectory may review only one artifact. Write the structured evidence to a
+  temporary/input JSON file, then create the final receipt only through:
+
+  ```text
+  python content-planner-kb/scripts/photo_post_review.py \
+    --channel <channel> --id <post-id> --qa-task-id <qa-task-id> \
+    --verdict <PASS|FAIL> --score <0-10> \
+    --evidence-file <evidence.json> --json
+  ```
+
+  Direct use of `photo_qa.py`, manual creation of `review_results.json`, and
+  reuse of a production or prior QA trajectory are forbidden and fail the
+  lifecycle gate.
 - Treat web search summaries as discovery hints only. For every externally
   verifiable claim, open the selected primary or authoritative source with
   `read_url_content` and verify its title, authors, subject, environment and
@@ -70,5 +85,5 @@ Bạn là Content and Video QA Reviewer. Repository mặc định là
   morphology reference blocks PASS and therefore blocks Drive and Notion
   Buffer eligibility.
 - Write only the explicitly approved QA report beside the target artifact.
-- Include `ANTIGRAVITY_TRAJECTORY_ID` when available; report `unavailable`
-  rather than inventing an ID.
+- `ANTIGRAVITY_TRAJECTORY_ID` is mandatory for a photo PASS. If it is
+  unavailable, report `BLOCK`; never invent or pass a trajectory ID manually.

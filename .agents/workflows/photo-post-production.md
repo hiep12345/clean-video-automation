@@ -86,6 +86,21 @@ is `UNVERIFIED`, never generated. A missing/unknown/retired format fails closed.
 5. Invalid/stale QA receipt: `QA_INVALID`.
 6. Quarantined asset without verified provenance: `UNVERIFIED_LEGACY`.
 7. Hash-bound QA PASS with explicit distribution eligibility: `READY`.
+
+For every generated ID, the coordinator must create and start a task assigned
+to `production-executor`, invoke that sub-agent, and pass the exact task ID to
+`photo_post_produce.py --execute-flowkit --production-task-id ...`. After the
+generation task completes, create a dependent QA task assigned to
+`qa-reviewer`, invoke a fresh sub-agent trajectory, and use
+`photo_post_review.py --qa-task-id ...`. The production command cannot write a
+PASS; the review command is the only supported writer of
+`review_results.json`.
+
+`READY` requires all of the following at the same revision: real reference
+evidence where configured, FlowKit media IDs, schema-v2 generation receipt,
+production task/trajectory binding, schema-v4 QA receipt, distinct dependent
+QA task/trajectory binding, and tracker-bound receipt hashes. A plausible
+receipt without those bindings is `GENERATED_INVALID` or `QA_INVALID`.
 8. Publication receipt plus uploaded flag: `UPLOADED`.
 
 Only `READY` may enter Drive/Notion Buffer. `UNVERIFIED_LEGACY` is blocked
