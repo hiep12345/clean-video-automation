@@ -1,0 +1,13 @@
+{
+  "schema_version": 1,
+  "handover_warning_steps": 70,
+  "handover_required_steps": 80,
+  "stale_review_days": 30,
+  "scan_receipts": true,
+  "quick_check": false,
+  "receipt_globs": [
+    "content-planner-kb/output/fb-posts/**/generation_receipt.json",
+    "content-planner-kb/output/fb-posts/**/review_results.json"
+  ],
+  "explicit_protected_cascade_ids": []
+}
