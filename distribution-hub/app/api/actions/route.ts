@@ -1,5 +1,7 @@
-import { requestActor } from "@/lib/auth";
-import { ActionError, applyJobAction, ensureDatabase } from "@/db/control";
+import { requestIdentity } from "@/lib/auth";
+import { ActionError } from "@/lib/errors";
+import { applyJobAction, ensureDatabase } from "@/db/control";
+import { resolveMembership } from "@/db/team";
 import type { JobAction } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
@@ -16,7 +18,7 @@ type ActionPayload = {
 
 export async function POST(request: Request) {
   try {
-    const actor = requestActor(request);
+    const identity = requestIdentity(request);
     const payload = (await request.json()) as ActionPayload;
     const supported = new Set<JobAction>([
       "claim",
@@ -34,12 +36,14 @@ export async function POST(request: Request) {
     }
 
     await ensureDatabase();
+    const member = await resolveMembership(identity);
     const result = await applyJobAction({
       jobId: payload.jobId ?? "",
       action: payload.action,
       expectedVersion: payload.expectedVersion,
       idempotencyKey: payload.idempotencyKey ?? "",
-      actor,
+      actor: member.email,
+      member,
       scheduledAt: payload.scheduledAt,
       externalUrl: payload.externalUrl,
       blockedReason: payload.blockedReason,

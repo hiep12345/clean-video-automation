@@ -39,7 +39,37 @@ export type QueueItem = {
 
 export type QueueResponse = {
   actor: string;
+  membership: MemberContext;
   items: QueueItem[];
+};
+
+export type TeamRole = "ADMIN" | "OPERATOR" | "VIEWER";
+
+export type MemberContext = {
+  email: string;
+  displayName: string;
+  role: TeamRole;
+  channelCodes: string[];
+  canManageTeam: boolean;
+};
+
+export type TeamMember = {
+  email: string;
+  displayName: string;
+  role: TeamRole;
+  active: boolean;
+  version: number;
+  channelCodes: string[];
+};
+
+export type TeamChannel = {
+  code: string;
+  name: string;
+};
+
+export type TeamResponse = {
+  members: TeamMember[];
+  channels: TeamChannel[];
 };
 
 export type JobAction =

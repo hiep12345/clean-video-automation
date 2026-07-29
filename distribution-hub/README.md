@@ -12,6 +12,9 @@ source of truth for Buffer Status.
 ## Safety model
 
 - Every platform target is an independent distribution job.
+- Team members and channel assignments are stored dynamically in D1.
+- Operators see and change only their assigned channels.
+- Admins manage members and assignments from the Team panel.
 - A team member must claim a job before scheduling or confirming upload.
 - Every mutation includes an expected version and idempotency key.
 - State changes are stored as immutable events.
@@ -25,3 +28,6 @@ npm run dev
 ```
 
 The local Cloudflare D1 database is initialized with demo data on first access.
+Production requires `DISTRIBUTION_ADMIN_EMAIL` as the immutable owner/admin
+bootstrap identity. Additional members are provisioned through the Team panel;
+their emails and channel assignments are never hard-coded in source.

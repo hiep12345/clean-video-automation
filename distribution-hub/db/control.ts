@@ -4,8 +4,10 @@ import type {
   DistributionJob,
   JobAction,
   JobState,
+  MemberContext,
   QueueItem,
 } from "@/lib/types";
+import { ActionError } from "@/lib/errors";
 
 type RawJob = {
   job_id: string;
@@ -38,6 +40,7 @@ type ActionInput = {
   expectedVersion: number;
   idempotencyKey: string;
   actor: string;
+  member: MemberContext;
   scheduledAt?: string;
   externalUrl?: string;
   blockedReason?: string;
@@ -57,6 +60,31 @@ const schemaStatements = [
     name TEXT NOT NULL,
     color TEXT NOT NULL DEFAULT 'slate',
     created_at TEXT NOT NULL
+  )`,
+  `CREATE TABLE IF NOT EXISTS team_members (
+    email TEXT PRIMARY KEY,
+    display_name TEXT NOT NULL,
+    role TEXT NOT NULL CHECK(role IN ('ADMIN', 'OPERATOR', 'VIEWER')),
+    active INTEGER NOT NULL DEFAULT 1,
+    version INTEGER NOT NULL DEFAULT 1,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+  )`,
+  `CREATE TABLE IF NOT EXISTS channel_assignments (
+    member_email TEXT NOT NULL REFERENCES team_members(email),
+    channel_id TEXT NOT NULL REFERENCES channels(id),
+    created_at TEXT NOT NULL,
+    UNIQUE(member_email, channel_id)
+  )`,
+  `CREATE TABLE IF NOT EXISTS team_events (
+    id TEXT PRIMARY KEY,
+    member_email TEXT NOT NULL,
+    actor_email TEXT NOT NULL,
+    event_type TEXT NOT NULL,
+    member_version INTEGER NOT NULL,
+    idempotency_key TEXT NOT NULL UNIQUE,
+    created_at TEXT NOT NULL,
+    UNIQUE(member_email, member_version)
   )`,
   `CREATE TABLE IF NOT EXISTS content_items (
     id TEXT PRIMARY KEY,
@@ -294,11 +322,18 @@ function mapJob(row: RawJob): DistributionJob {
   };
 }
 
-export async function listQueue(): Promise<QueueItem[]> {
+export async function listQueue(member: MemberContext): Promise<QueueItem[]> {
   const result = await database().prepare(latestJobsSql).all<RawJob>();
   const grouped = new Map<string, QueueItem>();
 
-  for (const row of result.results) {
+  const visibleRows =
+    member.role === "ADMIN"
+      ? result.results
+      : result.results.filter((row) =>
+          member.channelCodes.includes(row.channel_code),
+        );
+
+  for (const row of visibleRows) {
     let item = grouped.get(row.content_id);
     if (!item) {
       item = {
@@ -349,15 +384,6 @@ function validHttpsUrl(value: string | undefined): string {
   }
 }
 
-export class ActionError extends Error {
-  constructor(
-    public status: number,
-    message: string,
-  ) {
-    super(message);
-  }
-}
-
 export async function applyJobAction(input: ActionInput) {
   if (!input.jobId || !input.idempotencyKey) {
     throw new ActionError(400, "jobId and idempotencyKey are required");
@@ -379,6 +405,18 @@ export async function applyJobAction(input: ActionInput) {
 
   const current = await latestJob(input.jobId);
   if (!current) throw new ActionError(404, "Distribution job not found");
+  if (input.member.role === "VIEWER") {
+    throw new ActionError(403, "Viewer accounts cannot change upload state");
+  }
+  if (
+    input.member.role !== "ADMIN" &&
+    !input.member.channelCodes.includes(current.channel_code)
+  ) {
+    throw new ActionError(
+      403,
+      `You are not assigned to channel ${current.channel_code}`,
+    );
+  }
   if (Number(current.sequence) !== input.expectedVersion) {
     throw new ActionError(409, "Job changed; reload before trying again");
   }

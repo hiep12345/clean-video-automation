@@ -22,6 +22,55 @@ export const platforms = sqliteTable("platforms", {
   createdAt: text("created_at").notNull(),
 });
 
+export const teamMembers = sqliteTable("team_members", {
+  email: text("email").primaryKey(),
+  displayName: text("display_name").notNull(),
+  role: text("role").notNull(),
+  active: integer("active", { mode: "boolean" }).notNull().default(true),
+  version: integer("version").notNull().default(1),
+  createdAt: text("created_at").notNull(),
+  updatedAt: text("updated_at").notNull(),
+});
+
+export const channelAssignments = sqliteTable(
+  "channel_assignments",
+  {
+    memberEmail: text("member_email")
+      .notNull()
+      .references(() => teamMembers.email),
+    channelId: text("channel_id")
+      .notNull()
+      .references(() => channels.id),
+    createdAt: text("created_at").notNull(),
+  },
+  (table) => [
+    uniqueIndex("channel_assignment_uq").on(
+      table.memberEmail,
+      table.channelId,
+    ),
+  ],
+);
+
+export const teamEvents = sqliteTable(
+  "team_events",
+  {
+    id: text("id").primaryKey(),
+    memberEmail: text("member_email").notNull(),
+    actorEmail: text("actor_email").notNull(),
+    eventType: text("event_type").notNull(),
+    memberVersion: integer("member_version").notNull(),
+    idempotencyKey: text("idempotency_key").notNull(),
+    createdAt: text("created_at").notNull(),
+  },
+  (table) => [
+    uniqueIndex("team_event_idempotency_uq").on(table.idempotencyKey),
+    uniqueIndex("team_event_member_version_uq").on(
+      table.memberEmail,
+      table.memberVersion,
+    ),
+  ],
+);
+
 export const contentItems = sqliteTable("content_items", {
   id: text("id").primaryKey(),
   channelId: text("channel_id")

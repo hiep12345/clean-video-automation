@@ -8,6 +8,7 @@ import type {
   JobState,
   QueueResponse,
 } from "@/lib/types";
+import { TeamPanel } from "./team-panel";
 
 const stateLabel: Record<JobState | BufferState, string> = {
   READY: "Ready",
@@ -250,6 +251,13 @@ function JobPanel({ job, actor, busy, onAction }: JobPanelProps) {
 export function DistributionHub() {
   const [data, setData] = useState<QueueResponse>({
     actor: "",
+    membership: {
+      email: "",
+      displayName: "",
+      role: "VIEWER",
+      channelCodes: [],
+      canManageTeam: false,
+    },
     items: [],
   });
   const [loading, setLoading] = useState(true);
@@ -259,6 +267,7 @@ export function DistributionHub() {
   const [status, setStatus] = useState("ALL");
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [busyJob, setBusyJob] = useState<string | null>(null);
+  const [teamOpen, setTeamOpen] = useState(false);
 
   const load = useCallback(async () => {
     try {
@@ -387,7 +396,13 @@ export function DistributionHub() {
           <span className="avatar">{initials(data.actor || "LO")}</span>
           <div>
             <strong>{data.actor ? data.actor.split("@")[0] : "Loading"}</strong>
-            <span>Authenticated operator</span>
+            <span>
+              {data.membership.role}
+              {data.membership.role !== "ADMIN" &&
+              data.membership.channelCodes.length
+                ? ` · ${data.membership.channelCodes.join(", ")}`
+                : ""}
+            </span>
           </div>
         </div>
       </aside>
@@ -403,6 +418,14 @@ export function DistributionHub() {
             </p>
           </div>
           <div className="header-actions">
+            {data.membership.canManageTeam && (
+              <button
+                className="button button-secondary"
+                onClick={() => setTeamOpen(true)}
+              >
+                Team
+              </button>
+            )}
             <button className="button button-secondary" onClick={() => load()}>
               Refresh
             </button>
@@ -561,6 +584,7 @@ export function DistributionHub() {
           </aside>
         </div>
       )}
+      {teamOpen && <TeamPanel onClose={() => setTeamOpen(false)} />}
     </main>
   );
 }

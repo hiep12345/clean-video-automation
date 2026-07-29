@@ -832,6 +832,234 @@ h1 {
   margin: 4px 0 0;
 }
 
+.section-kicker {
+  display: inline-block;
+  margin-bottom: 7px;
+  color: #7868cc;
+  font-size: 9px;
+  font-weight: 750;
+  letter-spacing: 0.12em;
+}
+
+.team-drawer {
+  width: min(980px, 92vw);
+}
+
+.team-layout {
+  min-height: 460px;
+  display: grid;
+  grid-template-columns: minmax(280px, 0.8fr) minmax(360px, 1.2fr);
+  gap: 18px;
+  margin-top: 18px;
+}
+
+.member-list,
+.member-editor {
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  background: white;
+}
+
+.member-list {
+  overflow: hidden;
+}
+
+.member-list-head {
+  min-height: 52px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--line);
+  background: #fbfbfa;
+  font-size: 12px;
+}
+
+.member-row {
+  width: 100%;
+  min-height: 58px;
+  display: grid;
+  grid-template-columns: 30px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 9px;
+  padding: 9px 12px;
+  border: 0;
+  border-bottom: 1px solid var(--soft-line);
+  background: white;
+  text-align: left;
+  cursor: pointer;
+}
+
+.member-row:hover,
+.member-row.active {
+  background: #f7f5ff;
+}
+
+.member-row > span:nth-child(2) {
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+}
+
+.member-row strong,
+.member-row small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.member-row strong {
+  font-size: 11px;
+}
+
+.member-row small {
+  color: var(--muted);
+  font-size: 9px;
+}
+
+.member-row b {
+  grid-column: 2;
+  color: #a32b36;
+  font-size: 9px;
+}
+
+.role-chip {
+  border-radius: 4px;
+  padding: 3px 5px;
+  font-size: 8px;
+  font-weight: 750;
+}
+
+.role-admin {
+  color: #5943b7;
+  background: #ede9fe;
+}
+
+.role-operator {
+  color: #17643c;
+  background: #dff5e8;
+}
+
+.role-viewer {
+  color: #5f5b55;
+  background: #eceae7;
+}
+
+.team-empty {
+  padding: 18px;
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.member-editor {
+  padding: 16px;
+}
+
+.editor-title {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+.editor-title strong {
+  font-size: 13px;
+}
+
+.editor-title p {
+  max-width: 420px;
+  margin: 4px 0 0;
+  color: var(--muted);
+  font-size: 10px;
+  line-height: 1.45;
+}
+
+.editor-title > span {
+  color: var(--muted);
+  font-size: 9px;
+  white-space: nowrap;
+}
+
+.job-form select {
+  width: 100%;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 8px 9px;
+  background: white;
+  outline: none;
+  font-size: 11px;
+}
+
+.channel-picker {
+  margin: 15px 0;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+}
+
+.channel-picker legend {
+  padding: 0 5px;
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.channel-picker > p {
+  margin: 0 0 10px;
+  color: var(--muted);
+  font-size: 9px;
+}
+
+.channel-picker > div {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 7px;
+}
+
+.channel-picker label {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 7px 8px;
+  border: 1px solid var(--soft-line);
+  border-radius: 6px;
+  color: var(--muted);
+  font-size: 10px;
+}
+
+.channel-picker label span {
+  color: var(--ink);
+  font-weight: 750;
+}
+
+.active-toggle {
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+  padding: 11px 12px;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  background: #fbfbfa;
+}
+
+.active-toggle span {
+  display: grid;
+  gap: 3px;
+}
+
+.active-toggle strong {
+  font-size: 10px;
+}
+
+.active-toggle small {
+  color: var(--muted);
+  font-size: 9px;
+}
+
+.save-member {
+  width: 100%;
+  margin-top: 13px;
+}
+
 @media (max-width: 900px) {
   .app-shell {
     display: block;
@@ -891,6 +1119,14 @@ h1 {
   .search-box {
     flex: 1;
     min-width: 0;
+  }
+
+  .team-drawer {
+    width: 100%;
+  }
+
+  .team-layout {
+    grid-template-columns: 1fr;
   }
 }
 
