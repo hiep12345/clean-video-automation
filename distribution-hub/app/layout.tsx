@@ -13,13 +13,12 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Distribution Hub",
+  title: "Distribution Hub — Công việc đăng bài",
   description:
-    "Controlled manual upload operations for every channel and platform.",
+    "Quản lý công việc đăng bài thủ công theo từng kênh và nền tảng.",
   openGraph: {
-    title: "Distribution Hub",
-    description: "Controlled manual uploads",
-    images: ["/distribution-hub-preview.png"],
+    title: "Distribution Hub — Công việc đăng bài",
+    description: "Quản lý đăng bài thủ công theo từng nền tảng.",
   },
   icons: {
     icon: "/favicon.svg",
@@ -31,7 +30,7 @@ export default function RootLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
   return (
-    <html lang="en">
+    <html lang="vi">
       <body className={`${geistSans.variable} ${geistMono.variable}`}>
         {children}
       </body>

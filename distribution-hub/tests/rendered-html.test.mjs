@@ -3,16 +3,22 @@ import { readFile } from "node:fs/promises";
 import test from "node:test";
 
 test("the root route renders the Distribution Hub application", async () => {
-  const [page, layout, client] = await Promise.all([
+  const [page, layout, client, styles] = await Promise.all([
     readFile(new URL("../app/page.tsx", import.meta.url), "utf8"),
     readFile(new URL("../app/layout.tsx", import.meta.url), "utf8"),
     readFile(new URL("../app/distribution-hub.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../app/globals.css", import.meta.url), "utf8"),
   ]);
 
-  assert.match(layout, /title:\s*"Distribution Hub"/);
+  assert.match(layout, /Distribution Hub — Công việc đăng bài/);
+  assert.match(layout, /<html lang="vi">/);
   assert.match(page, /<DistributionHub \/>/);
-  assert.match(client, /Upload queue/i);
-  assert.match(client, /API controlled/i);
+  assert.match(client, /Công việc đăng bài/i);
+  assert.match(client, /Đang kết nối/i);
+  assert.match(client, /Nhận xử lý nền tảng này/i);
+  assert.match(styles, /min-height:\s*44px/);
+  assert.match(styles, /prefers-reduced-motion/);
+  assert.match(styles, /@media \(max-width: 920px\)/);
   assert.doesNotMatch(client, /Your site is taking shape|Building your site/i);
 });
 
@@ -28,6 +34,10 @@ test("manual state changes are exact, versioned, and idempotent", async () => {
   assert.match(actionsRoute, /idempotencyKey/);
   assert.match(control, /UNIQUE\(job_id, sequence\)/);
   assert.match(control, /Concurrent update detected/);
+  assert.match(control, /action_requests/);
+  assert.match(control, /request_fingerprint/);
+  assert.match(control, /already bound to another action request/);
+  assert.match(control, /\["CLAIMED", "SCHEDULED"\]\.includes\(current\.state\)/);
   assert.match(control, /valid HTTPS URL/);
   assert.match(client, /crypto\.randomUUID\(\)/);
   assert.doesNotMatch(actionsRoute, /bulk|channelId|contentIds/i);
@@ -48,6 +58,85 @@ test("team access is dynamic and enforced by channel on the server", async () =>
   assert.match(teamStore, /split\(","\)/);
   assert.match(control, /not assigned to channel/);
   assert.match(control, /Viewer accounts cannot change upload state/);
-  assert.match(client, /Assignment is stored in the database/);
+  assert.match(client, /Phân quyền được lưu trong hệ thống/);
   assert.doesNotMatch(teamStore, /bk\.operator|mt\.operator|su\.operator/i);
+});
+
+test("Cloudflare Access and OpenAI Sites identities are isolated by provider", async () => {
+  const [auth, pageAuth, cloudflareConfig] = await Promise.all([
+    readFile(new URL("../lib/auth.ts", import.meta.url), "utf8"),
+    readFile(new URL("../app/chatgpt-auth.ts", import.meta.url), "utf8"),
+    readFile(
+      new URL("../wrangler.cloudflare.jsonc", import.meta.url),
+      "utf8",
+    ),
+  ]);
+
+  assert.match(auth, /DISTRIBUTION_AUTH_PROVIDER/);
+  assert.match(auth, /cf-access-authenticated-user-email/);
+  assert.match(auth, /cf-access-jwt-assertion/);
+  assert.match(auth, /jwtVerify/);
+  assert.match(auth, /audience/);
+  assert.match(auth, /issuer/);
+  assert.match(auth, /tokenEmail !== headerEmail/);
+  assert.match(auth, /oai-authenticated-user-email/);
+  assert.match(auth, /provider === "cloudflare-access"/);
+  assert.match(pageAuth, /\/cdn-cgi\/access\/login/);
+  assert.match(cloudflareConfig, /"DISTRIBUTION_AUTH_PROVIDER": "cloudflare-access"/);
+  assert.match(cloudflareConfig, /"preview_urls": false/);
+  assert.match(cloudflareConfig, /"CF_ACCESS_AUD"/);
+  assert.match(cloudflareConfig, /"CF_ACCESS_JWKS_URL"/);
+  assert.doesNotMatch(cloudflareConfig, /REPLACE_WITH_D1_DATABASE_ID/);
+});
+
+test("production content enters D1 directly without a Notion runtime bridge", async () => {
+  const [route, ingest, bridge, control, readme] = await Promise.all([
+    readFile(new URL("../app/api/ingest/route.ts", import.meta.url), "utf8"),
+    readFile(new URL("../db/ingest.ts", import.meta.url), "utf8"),
+    readFile(
+      new URL("../scripts/sync_workspace_content.py", import.meta.url),
+      "utf8",
+    ),
+    readFile(new URL("../db/control.ts", import.meta.url), "utf8"),
+    readFile(new URL("../README.md", import.meta.url), "utf8"),
+  ]);
+
+  assert.match(route, /requestIngestPrincipal/);
+  assert.match(route, /512 \* 1024/);
+  assert.match(route, /Idempotency-Key header is required/);
+  assert.match(route, /Idempotency-Key header must match/);
+  assert.match(route, /dedicated Cloudflare Access service token/);
+  assert.match(ingest, /schemaVersion must be 1/);
+  assert.match(ingest, /production-pipeline/);
+  assert.match(ingest, /cannot exceed 100 items/);
+  assert.match(ingest, /contentType must be photo for ingest schema v1/);
+  assert.match(ingest, /active job history/);
+  assert.match(ingest, /active legacy job history/);
+  assert.match(ingest, /existing\.drive_file_id !== item\.driveFileId/);
+  assert.match(ingest, /existing\.asset_hash !== item\.assetHash/);
+  assert.match(
+    ingest,
+    /existing\.distribution_revision !== item\.distributionRevision/,
+  );
+  assert.match(ingest, /targetsPreserved/);
+  assert.match(ingest, /content_ingest_records/);
+  assert.match(ingest, /ingest_batches/);
+  assert.doesNotMatch(ingest, /notion|Buffer Status/i);
+  assert.doesNotMatch(bridge, /import\s+notion_sync|from\s+notion_sync/i);
+  assert.doesNotMatch(control, /seedContent|demo-photo|demo-video/i);
+  assert.match(readme, /does not read[\s\S]*write to it[\s\S]*mirror statuses/i);
+  assert.match(readme, /only operational source of truth/i);
+});
+
+test("ingest service identities are signed and explicitly allowlisted", async () => {
+  const auth = await readFile(
+    new URL("../lib/auth.ts", import.meta.url),
+    "utf8",
+  );
+
+  assert.match(auth, /payload\.common_name/);
+  assert.match(auth, /DISTRIBUTION_INGEST_SERVICE_IDS/);
+  assert.match(auth, /configuredIngestServiceIds\(\)\.has/);
+  assert.match(auth, /service:\$\{principal\.serviceTokenId\}/);
+  assert.match(auth, /jwtVerify/);
 });

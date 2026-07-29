@@ -25,6 +25,12 @@ const blankDraft: Draft = {
   version: 0,
 };
 
+const roleLabel: Record<TeamRole, string> = {
+  ADMIN: "Quản trị",
+  OPERATOR: "Đăng bài",
+  VIEWER: "Chỉ xem",
+};
+
 function draftFromMember(member: TeamMember): Draft {
   return {
     email: member.email,
@@ -66,6 +72,14 @@ export function TeamPanel({ onClose }: { onClose: () => void }) {
     const timer = window.setTimeout(() => void load(), 0);
     return () => window.clearTimeout(timer);
   }, [load]);
+
+  useEffect(() => {
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", closeOnEscape);
+    return () => window.removeEventListener("keydown", closeOnEscape);
+  }, [onClose]);
 
   function toggleChannel(code: string) {
     setDraft((current) => ({
@@ -117,34 +131,40 @@ export function TeamPanel({ onClose }: { onClose: () => void }) {
       <aside
         className="drawer team-drawer"
         onMouseDown={(event) => event.stopPropagation()}
-        aria-label="Team and channel assignments"
+        aria-label="Quản lý thành viên và phân quyền kênh"
+        aria-modal="true"
+        role="dialog"
       >
         <div className="drawer-head">
           <div>
-            <span className="section-kicker">ACCESS CONTROL</span>
-            <h2>Team assignments</h2>
-            <p>Members can work concurrently inside their assigned channels.</p>
+            <span className="section-kicker">QUẢN LÝ QUYỀN TRUY CẬP</span>
+            <h2>Thành viên và kênh phụ trách</h2>
+            <p>Mỗi người chỉ nhìn thấy và xử lý các kênh được phân công.</p>
           </div>
-          <button className="close-button" onClick={onClose} aria-label="Close team panel">
+          <button className="close-button" onClick={onClose} aria-label="Đóng quản lý thành viên">
             ×
           </button>
         </div>
 
-        {error && <div className="error-banner">{error}</div>}
+        {error && (
+          <div className="error-banner" role="alert">
+            {error}
+          </div>
+        )}
 
         <div className="team-layout">
           <section className="member-list">
             <div className="member-list-head">
-              <strong>Members</strong>
+            <strong>Danh sách thành viên</strong>
               <button
                 className="button button-secondary"
                 onClick={() => setDraft(blankDraft)}
               >
-                + Add member
+                + Thêm thành viên
               </button>
             </div>
             {loading ? (
-              <p className="team-empty">Loading team…</p>
+              <p className="team-empty">Đang tải thành viên…</p>
             ) : (
               data.members.map((member) => (
                 <button
@@ -164,9 +184,9 @@ export function TeamPanel({ onClose }: { onClose: () => void }) {
                     <small>{member.email}</small>
                   </span>
                   <span className={`role-chip role-${member.role.toLowerCase()}`}>
-                    {member.role}
+                    {roleLabel[member.role]}
                   </span>
-                  {!member.active && <b>Inactive</b>}
+                  {!member.active && <b>Đã khóa</b>}
                 </button>
               ))
             )}
@@ -175,13 +195,15 @@ export function TeamPanel({ onClose }: { onClose: () => void }) {
           <section className="member-editor">
             <div className="editor-title">
               <div>
-                <strong>{draft.version ? "Edit member" : "New member"}</strong>
+                <strong>
+                  {draft.version ? "Chỉnh sửa thành viên" : "Thêm thành viên mới"}
+                </strong>
                 <p>
-                  Assignment is stored in the database, never hard-coded in the
-                  interface.
+                  Phân quyền được lưu trong hệ thống và có thể thay đổi bất cứ
+                  lúc nào.
                 </p>
               </div>
-              {draft.version > 0 && <span>Version {draft.version}</span>}
+              {draft.version > 0 && <span>Phiên bản {draft.version}</span>}
             </div>
 
             <div className="job-form">
@@ -189,6 +211,7 @@ export function TeamPanel({ onClose }: { onClose: () => void }) {
                 Email
                 <input
                   type="email"
+                  autoComplete="email"
                   value={draft.email}
                   disabled={draft.version > 0}
                   onChange={(event) =>
@@ -201,7 +224,7 @@ export function TeamPanel({ onClose }: { onClose: () => void }) {
                 />
               </label>
               <label>
-                Display name
+                Tên hiển thị
                 <input
                   value={draft.displayName}
                   onChange={(event) =>
@@ -210,11 +233,11 @@ export function TeamPanel({ onClose }: { onClose: () => void }) {
                       displayName: event.target.value,
                     }))
                   }
-                  placeholder="Team member"
+                  placeholder="Tên thành viên"
                 />
               </label>
               <label>
-                Role
+                Vai trò
                 <select
                   value={draft.role}
                   onChange={(event) =>
@@ -224,16 +247,16 @@ export function TeamPanel({ onClose }: { onClose: () => void }) {
                     }))
                   }
                 >
-                  <option value="OPERATOR">Operator — update assigned channels</option>
-                  <option value="VIEWER">Viewer — read assigned channels</option>
-                  <option value="ADMIN">Admin — all channels and team access</option>
+                  <option value="OPERATOR">Người đăng bài — cập nhật kênh được giao</option>
+                  <option value="VIEWER">Chỉ xem — đọc kênh được giao</option>
+                  <option value="ADMIN">Quản trị viên — toàn bộ kênh và thành viên</option>
                 </select>
               </label>
             </div>
 
             <fieldset className="channel-picker">
-              <legend>Assigned channels</legend>
-              <p>Admins automatically see every channel.</p>
+              <legend>Kênh được phân công</legend>
+              <p>Quản trị viên tự động nhìn thấy tất cả kênh.</p>
               <div>
                 {data.channels.map((channel) => (
                   <label key={channel.code}>
@@ -262,8 +285,8 @@ export function TeamPanel({ onClose }: { onClose: () => void }) {
                 }
               />
               <span>
-                <strong>Active access</strong>
-                <small>Inactive members cannot read or change queue data.</small>
+                <strong>Cho phép truy cập</strong>
+                <small>Tắt mục này để khóa quyền xem và cập nhật công việc.</small>
               </span>
             </label>
 
@@ -272,17 +295,16 @@ export function TeamPanel({ onClose }: { onClose: () => void }) {
               disabled={!canSave || saving}
               onClick={() => void save()}
             >
-              {saving ? "Saving…" : "Save member assignment"}
+              {saving ? "Đang lưu…" : "Lưu phân quyền"}
             </button>
           </section>
         </div>
 
         <div className="audit-note">
-          <strong>Concurrency is per platform job.</strong>
+          <strong>Nhiều người có thể làm việc cùng lúc.</strong>
           <p>
-            Assignments decide which channels a member can access. Claim locks
-            only the selected content-platform job, so the rest of the team can
-            continue working at the same time.
+            Khi một người nhận xử lý, hệ thống chỉ khóa đúng bài và nền tảng đó.
+            Các thành viên khác vẫn tiếp tục công việc của mình bình thường.
           </p>
         </div>
       </aside>

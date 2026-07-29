@@ -28,7 +28,7 @@ function errorResponse(error: unknown): Response {
 
 export async function GET(request: Request) {
   try {
-    const identity = requestIdentity(request);
+    const identity = await requestIdentity(request);
     await ensureDatabase();
     const actor = await resolveMembership(identity);
     return Response.json(await listTeam(actor));
@@ -39,7 +39,7 @@ export async function GET(request: Request) {
 
 export async function POST(request: Request) {
   try {
-    const identity = requestIdentity(request);
+    const identity = await requestIdentity(request);
     const payload = (await request.json()) as TeamPayload;
     if (payload.action !== "save") {
       throw new ActionError(400, "Unsupported team action");

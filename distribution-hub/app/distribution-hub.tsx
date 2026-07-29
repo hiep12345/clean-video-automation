@@ -11,13 +11,13 @@ import type {
 import { TeamPanel } from "./team-panel";
 
 const stateLabel: Record<JobState | BufferState, string> = {
-  READY: "Ready",
-  CLAIMED: "Claimed",
-  SCHEDULED: "Scheduled",
-  UPLOADED: "Uploaded",
-  BLOCKED: "Blocked",
-  IN_PROGRESS: "In progress",
-  COMPLETE: "Complete",
+  READY: "Sẵn sàng",
+  CLAIMED: "Đang xử lý",
+  SCHEDULED: "Đã lên lịch",
+  UPLOADED: "Đã đăng",
+  BLOCKED: "Đang vướng",
+  IN_PROGRESS: "Đang làm",
+  COMPLETE: "Hoàn tất",
 };
 
 function initials(value: string) {
@@ -26,9 +26,9 @@ function initials(value: string) {
 
 function formatDate(value: string | null) {
   if (!value) return "—";
-  return new Intl.DateTimeFormat("en", {
-    month: "short",
+  return new Intl.DateTimeFormat("vi-VN", {
     day: "2-digit",
+    month: "2-digit",
   }).format(new Date(value));
 }
 
@@ -72,15 +72,15 @@ function JobPanel({ job, actor, busy, onAction }: JobPanelProps) {
       <div className="job-card-head">
         <div>
           <PlatformMark job={job} />
-          <p className="job-updated">Version {job.version}</p>
+          <p className="job-updated">Phiên bản {job.version}</p>
         </div>
         {job.assigneeEmail ? (
           <span className="assignee">
             <span className="avatar">{initials(job.assigneeEmail)}</span>
-            {mine ? "You" : job.assigneeEmail.split("@")[0]}
+            {mine ? "Bạn đang xử lý" : job.assigneeEmail.split("@")[0]}
           </span>
         ) : (
-          <span className="unassigned">Unassigned</span>
+          <span className="unassigned">Chưa có người nhận</span>
         )}
       </div>
 
@@ -91,7 +91,7 @@ function JobPanel({ job, actor, busy, onAction }: JobPanelProps) {
             disabled={busy}
             onClick={() => onAction(job, "claim")}
           >
-            Claim this platform
+            Nhận xử lý nền tảng này
           </button>
           <button
             className="button button-ghost"
@@ -103,7 +103,7 @@ function JobPanel({ job, actor, busy, onAction }: JobPanelProps) {
               })
             }
           >
-            Block
+            Báo đang vướng
           </button>
         </div>
       )}
@@ -111,8 +111,9 @@ function JobPanel({ job, actor, busy, onAction }: JobPanelProps) {
       {job.state === "CLAIMED" && mine && (
         <div className="job-form">
           <label>
-            Published URL
+            Link bài đã đăng
             <input
+              type="url"
               value={publishedUrl}
               onChange={(event) => setPublishedUrl(event.target.value)}
               placeholder="https://facebook.com/..."
@@ -125,11 +126,11 @@ function JobPanel({ job, actor, busy, onAction }: JobPanelProps) {
               onAction(job, "upload", { externalUrl: publishedUrl })
             }
           >
-            Mark uploaded
+            Xác nhận đã đăng
           </button>
           <div className="form-split">
             <label>
-              Schedule time
+              Thời gian dự kiến đăng
               <input
                 type="datetime-local"
                 value={scheduledAt}
@@ -141,15 +142,15 @@ function JobPanel({ job, actor, busy, onAction }: JobPanelProps) {
               disabled={busy || !scheduledAt}
               onClick={() => onAction(job, "schedule", { scheduledAt })}
             >
-              Schedule
+              Lưu lịch đăng
             </button>
           </div>
           <label>
-            Blocked reason
+            Vấn đề đang gặp
             <input
               value={blockedReason}
               onChange={(event) => setBlockedReason(event.target.value)}
-              placeholder="What prevents this upload?"
+              placeholder="Ví dụ: thiếu caption, link Drive lỗi..."
             />
           </label>
           <div className="job-actions">
@@ -160,14 +161,14 @@ function JobPanel({ job, actor, busy, onAction }: JobPanelProps) {
                 onAction(job, "block", { blockedReason })
               }
             >
-              Block with reason
+              Lưu vấn đề
             </button>
             <button
               className="button button-ghost"
               disabled={busy}
               onClick={() => onAction(job, "release")}
             >
-              Release
+              Trả việc
             </button>
           </div>
         </div>
@@ -175,7 +176,7 @@ function JobPanel({ job, actor, busy, onAction }: JobPanelProps) {
 
       {job.state === "CLAIMED" && !mine && (
         <p className="job-note">
-          Locked by {job.assigneeEmail}. The claim expires at{" "}
+          {job.assigneeEmail} đang xử lý nền tảng này. Quyền giữ việc hết hạn lúc{" "}
           {job.claimExpiresAt
             ? new Date(job.claimExpiresAt).toLocaleTimeString()
             : "—"}.
@@ -185,7 +186,7 @@ function JobPanel({ job, actor, busy, onAction }: JobPanelProps) {
       {job.state === "SCHEDULED" && (
         <div className="job-form">
           <p className="job-note">
-            Scheduled for{" "}
+            Dự kiến đăng lúc{" "}
             {job.scheduledAt
               ? new Date(job.scheduledAt).toLocaleString()
               : "—"}
@@ -193,11 +194,12 @@ function JobPanel({ job, actor, busy, onAction }: JobPanelProps) {
           {mine && (
             <>
               <label>
-                Published URL
+                Link bài đã đăng
                 <input
+                  type="url"
                   value={publishedUrl}
                   onChange={(event) => setPublishedUrl(event.target.value)}
-                  placeholder="Paste the live post URL"
+                  placeholder="Dán link bài đăng thực tế"
                 />
               </label>
               <button
@@ -207,7 +209,7 @@ function JobPanel({ job, actor, busy, onAction }: JobPanelProps) {
                   onAction(job, "upload", { externalUrl: publishedUrl })
                 }
               >
-                Confirm uploaded
+                Xác nhận đã đăng
               </button>
             </>
           )}
@@ -222,7 +224,7 @@ function JobPanel({ job, actor, busy, onAction }: JobPanelProps) {
             disabled={busy}
             onClick={() => onAction(job, "unblock")}
           >
-            Resolve and return to Ready
+            Đã xử lý xong, đưa về Sẵn sàng
           </button>
         </div>
       )}
@@ -230,7 +232,7 @@ function JobPanel({ job, actor, busy, onAction }: JobPanelProps) {
       {job.state === "UPLOADED" && (
         <div className="receipt-box">
           <div>
-            <strong>Verified manual receipt</strong>
+            <strong>Đã lưu bằng chứng đăng bài</strong>
             <p>
               {job.uploadedAt
                 ? new Date(job.uploadedAt).toLocaleString()
@@ -239,7 +241,7 @@ function JobPanel({ job, actor, busy, onAction }: JobPanelProps) {
           </div>
           {job.externalUrl && (
             <a href={job.externalUrl} target="_blank" rel="noreferrer">
-              Open post ↗
+              Mở bài đăng ↗
             </a>
           )}
         </div>
@@ -289,6 +291,15 @@ export function DistributionHub() {
     const timer = window.setTimeout(() => void load(), 0);
     return () => window.clearTimeout(timer);
   }, [load]);
+
+  useEffect(() => {
+    if (!selectedId) return;
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setSelectedId(null);
+    };
+    window.addEventListener("keydown", closeOnEscape);
+    return () => window.removeEventListener("keydown", closeOnEscape);
+  }, [selectedId]);
 
   const channels = useMemo(
     () =>
@@ -362,19 +373,20 @@ export function DistributionHub() {
     <main className="app-shell">
       <aside className="sidebar">
         <div className="brand">
-          <span className="brand-mark">D</span>
+          <span className="brand-mark">DH</span>
           <div>
             <strong>Distribution Hub</strong>
-            <span>Manual upload control</span>
+            <span>Trung tâm đăng bài thủ công</span>
           </div>
         </div>
 
+        <p className="nav-label">KÊNH NỘI DUNG</p>
         <nav className="channel-nav" aria-label="Channels">
           <button
             className={channel === "ALL" ? "nav-item active" : "nav-item"}
             onClick={() => setChannel("ALL")}
           >
-            <span>▦</span> All channels
+            <span className="all-channel-mark" /> Tất cả kênh
             <b>{data.items.length}</b>
           </button>
           {channels.map((code) => (
@@ -395,9 +407,13 @@ export function DistributionHub() {
         <div className="sidebar-footer">
           <span className="avatar">{initials(data.actor || "LO")}</span>
           <div>
-            <strong>{data.actor ? data.actor.split("@")[0] : "Loading"}</strong>
+            <strong>{data.actor ? data.actor.split("@")[0] : "Đang tải"}</strong>
             <span>
-              {data.membership.role}
+              {data.membership.role === "ADMIN"
+                ? "Quản trị viên"
+                : data.membership.role === "OPERATOR"
+                  ? "Người đăng bài"
+                  : "Chỉ xem"}
               {data.membership.role !== "ADMIN" &&
               data.membership.channelCodes.length
                 ? ` · ${data.membership.channelCodes.join(", ")}`
@@ -410,11 +426,11 @@ export function DistributionHub() {
       <section className="workspace">
         <header className="workspace-header">
           <div>
-            <p className="eyebrow">OPERATIONS / DISTRIBUTION</p>
-            <h1>Upload queue</h1>
+            <p className="eyebrow">DISTRIBUTION HUB</p>
+            <h1>Công việc đăng bài</h1>
             <p className="subtitle">
-              One controlled action per content and platform. No direct status
-              edits.
+              Chọn một bài để xử lý riêng từng nền tảng. Trạng thái được hệ
+              thống tự tính từ thao tác thực tế.
             </p>
           </div>
           <div className="header-actions">
@@ -423,66 +439,142 @@ export function DistributionHub() {
                 className="button button-secondary"
                 onClick={() => setTeamOpen(true)}
               >
-                Team
+                Thành viên
               </button>
             )}
             <button className="button button-secondary" onClick={() => load()}>
-              Refresh
+              Làm mới
             </button>
             <span className="live-indicator">
-              <i /> API controlled
+              <i /> Đang kết nối
             </span>
           </div>
         </header>
 
-        <div className="stat-strip">
-          <div><span>Ready</span><strong>{stats.ready}</strong></div>
-          <div><span>In progress</span><strong>{stats.active}</strong></div>
-          <div><span>Blocked</span><strong>{stats.blocked}</strong></div>
-          <div><span>Complete</span><strong>{stats.complete}</strong></div>
+        <div className="stat-strip" aria-label="Tổng quan trạng thái">
+          <button
+            className={status === "READY" ? "metric-card active" : "metric-card"}
+            onClick={() => setStatus(status === "READY" ? "ALL" : "READY")}
+          >
+            <span className="metric-dot metric-ready" />
+            <span>
+              <b>Sẵn sàng</b>
+              <small>Có thể nhận xử lý ngay</small>
+            </span>
+            <strong>{stats.ready}</strong>
+          </button>
+          <button
+            className={
+              status === "IN_PROGRESS" ? "metric-card active" : "metric-card"
+            }
+            onClick={() =>
+              setStatus(status === "IN_PROGRESS" ? "ALL" : "IN_PROGRESS")
+            }
+          >
+            <span className="metric-dot metric-progress" />
+            <span>
+              <b>Đang làm</b>
+              <small>Đã có người nhận việc</small>
+            </span>
+            <strong>{stats.active}</strong>
+          </button>
+          <button
+            className={
+              status === "BLOCKED" ? "metric-card active" : "metric-card"
+            }
+            onClick={() => setStatus(status === "BLOCKED" ? "ALL" : "BLOCKED")}
+          >
+            <span className="metric-dot metric-blocked" />
+            <span>
+              <b>Đang vướng</b>
+              <small>Cần kiểm tra hoặc bổ sung</small>
+            </span>
+            <strong>{stats.blocked}</strong>
+          </button>
+          <button
+            className={
+              status === "COMPLETE" ? "metric-card active" : "metric-card"
+            }
+            onClick={() =>
+              setStatus(status === "COMPLETE" ? "ALL" : "COMPLETE")
+            }
+          >
+            <span className="metric-dot metric-complete" />
+            <span>
+              <b>Hoàn tất</b>
+              <small>Đã đủ các nền tảng</small>
+            </span>
+            <strong>{stats.complete}</strong>
+          </button>
         </div>
 
         <div className="database-toolbar">
-          <div className="view-tabs">
-            <button className="view-tab active">Table</button>
-            <button className="view-tab" disabled>Board</button>
-            <button className="view-tab" disabled>Audit</button>
+          <div className="result-heading">
+            <strong>Danh sách nội dung</strong>
+            <span>{filtered.length} bài phù hợp</span>
           </div>
           <div className="filters">
             <label className="search-box">
-              <span>⌕</span>
+              <span aria-hidden="true">⌕</span>
               <input
                 value={query}
                 onChange={(event) => setQuery(event.target.value)}
-                placeholder="Search content or ID"
+                placeholder="Tìm tên bài hoặc mã nội dung"
+                aria-label="Tìm nội dung"
               />
             </label>
-            <select value={status} onChange={(event) => setStatus(event.target.value)}>
-              <option value="ALL">All statuses</option>
-              <option value="READY">Ready</option>
-              <option value="IN_PROGRESS">In progress</option>
-              <option value="BLOCKED">Blocked</option>
-              <option value="COMPLETE">Complete</option>
+            <select
+              value={status}
+              onChange={(event) => setStatus(event.target.value)}
+              aria-label="Lọc theo trạng thái"
+            >
+              <option value="ALL">Tất cả trạng thái</option>
+              <option value="READY">Sẵn sàng</option>
+              <option value="IN_PROGRESS">Đang làm</option>
+              <option value="BLOCKED">Đang vướng</option>
+              <option value="COMPLETE">Hoàn tất</option>
             </select>
+            {(query || status !== "ALL" || channel !== "ALL") && (
+              <button
+                className="button button-ghost clear-filter"
+                onClick={() => {
+                  setQuery("");
+                  setStatus("ALL");
+                  setChannel("ALL");
+                }}
+              >
+                Xóa lọc
+              </button>
+            )}
           </div>
         </div>
 
-        {error && <div className="error-banner">{error}</div>}
+        {error && (
+          <div className="error-banner" role="alert">
+            {error}
+          </div>
+        )}
 
         <div className="table-card">
           <div className="table-head row-grid">
-            <span>Content</span>
-            <span>Channel</span>
-            <span>Platforms</span>
-            <span>Buffer</span>
-            <span>Produced</span>
+            <span>Nội dung</span>
+            <span>Kênh</span>
+            <span>Nền tảng</span>
+            <span>Trạng thái</span>
+            <span>Ngày tạo</span>
             <span>QA</span>
             <span />
           </div>
           {loading ? (
-            <div className="empty-state">Loading controlled queue…</div>
+            <div className="empty-state">
+              <span className="loading-ring" />
+              <span>Đang tải danh sách công việc…</span>
+            </div>
           ) : filtered.length === 0 ? (
-            <div className="empty-state">No content matches this view.</div>
+            <div className="empty-state">
+              <strong>Không tìm thấy nội dung</strong>
+              <span>Hãy thử đổi kênh, trạng thái hoặc từ khóa tìm kiếm.</span>
+            </div>
           ) : (
             filtered.map((item) => (
               <button
@@ -491,11 +583,11 @@ export function DistributionHub() {
                 onClick={() => setSelectedId(item.id)}
               >
                 <span className="content-cell">
-                  <span className="content-icon">
-                    {item.contentType.toLowerCase() === "photo" ? "▧" : "▶"}
+                  <span className="content-icon" aria-hidden="true">
+                    {item.contentType.toLowerCase() === "photo" ? "ẢNH" : "VIDEO"}
                   </span>
                   <span>
-                    <strong>{item.title}</strong>
+                    <strong title={item.title}>{item.title}</strong>
                     <small>{item.id}</small>
                   </span>
                 </span>
@@ -519,7 +611,11 @@ export function DistributionHub() {
             ))
           )}
           <div className="table-footer">
-            {filtered.length} content items · {filtered.reduce((count, item) => count + item.jobs.length, 0)} exact platform jobs
+            <strong>{filtered.length} bài</strong>
+            <span>
+              {filtered.reduce((count, item) => count + item.jobs.length, 0)}{" "}
+              công việc nền tảng độc lập
+            </span>
           </div>
         </div>
       </section>
@@ -529,7 +625,9 @@ export function DistributionHub() {
           <aside
             className="drawer"
             onMouseDown={(event) => event.stopPropagation()}
-            aria-label="Content distribution details"
+            aria-label="Chi tiết công việc đăng bài"
+            aria-modal="true"
+            role="dialog"
           >
             <div className="drawer-head">
               <div>
@@ -542,26 +640,26 @@ export function DistributionHub() {
               <button
                 className="close-button"
                 onClick={() => setSelectedId(null)}
-                aria-label="Close panel"
+                aria-label="Đóng chi tiết"
               >
                 ×
               </button>
             </div>
 
             <div className="content-summary">
-              <div><span>Aggregate</span><StatusPill state={selected.bufferState} /></div>
-              <div><span>QA score</span><strong>{selected.qaScore?.toFixed(1) ?? "—"}</strong></div>
-              <div><span>Produced</span><strong>{formatDate(selected.producedAt)}</strong></div>
+              <div><span>Trạng thái tổng</span><StatusPill state={selected.bufferState} /></div>
+              <div><span>Điểm QA</span><strong>{selected.qaScore?.toFixed(1) ?? "—"}</strong></div>
+              <div><span>Ngày tạo</span><strong>{formatDate(selected.producedAt)}</strong></div>
               {selected.driveUrl && (
                 <a href={selected.driveUrl} target="_blank" rel="noreferrer">
-                  Open Drive asset ↗
+                  Mở file Google Drive ↗
                 </a>
               )}
             </div>
 
             <div className="drawer-section-title">
-              <h3>Platform jobs</h3>
-              <span>{selected.jobs.length} targets</span>
+              <h3>Xử lý theo nền tảng</h3>
+              <span>{selected.jobs.length} nền tảng</span>
             </div>
             {selected.jobs.map((job) => (
               <JobPanel
@@ -574,11 +672,11 @@ export function DistributionHub() {
             ))}
 
             <div className="audit-note">
-              <strong>Every action is immutable.</strong>
+              <strong>Lịch sử thao tác được lưu tự động.</strong>
               <p>
-                The API records operator identity, job version, transition,
-                receipt and timestamp. Aggregate status is calculated, never
-                edited.
+                Hệ thống ghi nhận người thực hiện, thời gian, phiên bản và link
+                bài đăng. Trạng thái tổng hợp được tính tự động nên không bị
+                ghi đè bởi lần đồng bộ khác.
               </p>
             </div>
           </aside>

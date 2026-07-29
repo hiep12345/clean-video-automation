@@ -134,3 +134,48 @@ export const distributionEvents = sqliteTable(
     ),
   ],
 );
+
+export const actionRequests = sqliteTable("action_requests", {
+  idempotencyKey: text("idempotency_key").primaryKey(),
+  requestFingerprint: text("request_fingerprint").notNull(),
+  jobId: text("job_id")
+    .notNull()
+    .references(() => distributionJobs.id),
+  responseJson: text("response_json").notNull(),
+  createdAt: text("created_at").notNull(),
+});
+
+export const contentIngestRecords = sqliteTable(
+  "content_ingest_records",
+  {
+    contentId: text("content_id")
+      .primaryKey()
+      .references(() => contentItems.id),
+    sourceSystem: text("source_system").notNull(),
+    sourceRevision: text("source_revision").notNull(),
+    sourceUpdatedAt: text("source_updated_at").notNull(),
+    driveFileId: text("drive_file_id").notNull(),
+    assetHash: text("asset_hash").notNull(),
+    distributionRevision: text("distribution_revision").notNull(),
+    qaReceiptHash: text("qa_receipt_hash").notNull(),
+    payloadHash: text("payload_hash").notNull(),
+    firstIngestedAt: text("first_ingested_at").notNull(),
+    lastIngestedAt: text("last_ingested_at").notNull(),
+  },
+  (table) => [
+    uniqueIndex("content_ingest_artifact_uq").on(
+      table.driveFileId,
+      table.distributionRevision,
+    ),
+  ],
+);
+
+export const ingestBatches = sqliteTable("ingest_batches", {
+  idempotencyKey: text("idempotency_key").primaryKey(),
+  sourceSystem: text("source_system").notNull(),
+  actor: text("actor").notNull(),
+  payloadHash: text("payload_hash").notNull(),
+  itemCount: integer("item_count").notNull(),
+  responseJson: text("response_json").notNull(),
+  createdAt: text("created_at").notNull(),
+});

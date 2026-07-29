@@ -7,7 +7,7 @@ export const dynamic = "force-dynamic";
 
 export async function GET(request: Request) {
   try {
-    const identity = requestIdentity(request);
+    const identity = await requestIdentity(request);
     await ensureDatabase();
     const membership = await resolveMembership(identity);
     return Response.json({

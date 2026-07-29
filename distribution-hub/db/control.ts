@@ -122,59 +122,37 @@ const schemaStatements = [
   )`,
   `CREATE INDEX IF NOT EXISTS distribution_events_job_idx
     ON distribution_events(job_id, sequence DESC)`,
-];
-
-const seedChannels: Array<[string, string, string, string]> = [
-  ["channel-bk", "BK", "Botanical Killers", "rose"],
-  ["channel-mt", "MT", "Mix Therapy", "violet"],
-  ["channel-su", "SU", "Science Unlocked", "emerald"],
-];
-
-const seedPlatforms: Array<[string, string, string, string]> = [
-  ["platform-fb-ig", "fb-ig", "FB / IG", "blue"],
-  ["platform-youtube", "youtube", "YouTube", "red"],
-  ["platform-amz", "amz", "Amazon", "amber"],
-];
-
-const seedContent: Array<
-  [string, string, string, string, string, string, number]
-> = [
-  [
-    "bk-photo-bk-p010-kalanchoe-pet-toxicity",
-    "channel-bk",
-    "Kalanchoe Pet Toxicity",
-    "Photo",
-    "https://drive.google.com/",
-    "2026-07-28",
-    10,
-  ],
-  [
-    "bk-photo-bk-p011-aloe-pet-toxicity",
-    "channel-bk",
-    "Aloe Pet Toxicity",
-    "Photo",
-    "https://drive.google.com/",
-    "2026-07-28",
-    10,
-  ],
-  [
-    "mt-photo-mt-p007-turquoise-reveal",
-    "channel-mt",
-    "Turquoise Reveal",
-    "Photo",
-    "https://drive.google.com/",
-    "2026-07-29",
-    10,
-  ],
-  [
-    "su-photo-su-p001-deep-sea-signal",
-    "channel-su",
-    "Deep Sea Signal",
-    "Photo",
-    "https://drive.google.com/",
-    "2026-07-29",
-    9.8,
-  ],
+  `CREATE TABLE IF NOT EXISTS action_requests (
+    idempotency_key TEXT PRIMARY KEY,
+    request_fingerprint TEXT NOT NULL,
+    job_id TEXT NOT NULL REFERENCES distribution_jobs(id),
+    response_json TEXT NOT NULL,
+    created_at TEXT NOT NULL
+  )`,
+  `CREATE TABLE IF NOT EXISTS content_ingest_records (
+    content_id TEXT PRIMARY KEY REFERENCES content_items(id),
+    source_system TEXT NOT NULL,
+    source_revision TEXT NOT NULL,
+    source_updated_at TEXT NOT NULL,
+    drive_file_id TEXT NOT NULL,
+    asset_hash TEXT NOT NULL,
+    distribution_revision TEXT NOT NULL,
+    qa_receipt_hash TEXT NOT NULL,
+    payload_hash TEXT NOT NULL,
+    first_ingested_at TEXT NOT NULL,
+    last_ingested_at TEXT NOT NULL
+  )`,
+  `CREATE UNIQUE INDEX IF NOT EXISTS content_ingest_artifact_uq
+    ON content_ingest_records(drive_file_id, distribution_revision)`,
+  `CREATE TABLE IF NOT EXISTS ingest_batches (
+    idempotency_key TEXT PRIMARY KEY,
+    source_system TEXT NOT NULL,
+    actor TEXT NOT NULL,
+    payload_hash TEXT NOT NULL,
+    item_count INTEGER NOT NULL,
+    response_json TEXT NOT NULL,
+    created_at TEXT NOT NULL
+  )`,
 ];
 
 function database(): D1Database {
@@ -185,70 +163,6 @@ function database(): D1Database {
 export async function ensureDatabase(): Promise<void> {
   const db = database();
   await db.batch(schemaStatements.map((statement) => db.prepare(statement)));
-
-  const row = await db
-    .prepare("SELECT COUNT(*) AS count FROM content_items")
-    .first<{ count: number }>();
-  if ((row?.count ?? 0) > 0) return;
-
-  const now = new Date().toISOString();
-  const inserts: D1PreparedStatement[] = [];
-  for (const channel of seedChannels) {
-    inserts.push(
-      db
-        .prepare(
-          "INSERT OR IGNORE INTO channels(id, code, name, color, created_at) VALUES (?, ?, ?, ?, ?)",
-        )
-        .bind(...channel, now),
-    );
-  }
-  for (const platform of seedPlatforms) {
-    inserts.push(
-      db
-        .prepare(
-          "INSERT OR IGNORE INTO platforms(id, code, name, color, created_at) VALUES (?, ?, ?, ?, ?)",
-        )
-        .bind(...platform, now),
-    );
-  }
-  for (const content of seedContent) {
-    inserts.push(
-      db
-        .prepare(
-          `INSERT OR IGNORE INTO content_items(
-            id, channel_id, title, content_type, drive_url,
-            produced_at, qa_score, created_at
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-        )
-        .bind(...content, now),
-    );
-    for (const platformId of ["platform-fb-ig", "platform-youtube"]) {
-      const jobId = `${content[0]}:${platformId}`;
-      inserts.push(
-        db
-          .prepare(
-            "INSERT OR IGNORE INTO distribution_jobs(id, content_id, platform_id, created_at) VALUES (?, ?, ?, ?)",
-          )
-          .bind(jobId, content[0], platformId, now),
-      );
-      inserts.push(
-        db
-          .prepare(
-            `INSERT OR IGNORE INTO distribution_events(
-              id, job_id, sequence, event_type, state, actor_email,
-              idempotency_key, created_at
-            ) VALUES (?, ?, 1, 'CREATED', 'READY', 'system@distribution-hub', ?, ?)`,
-          )
-          .bind(
-            `event:${jobId}:1`,
-            jobId,
-            `seed:${jobId}:1`,
-            now,
-          ),
-      );
-    }
-  }
-  await db.batch(inserts);
 }
 
 const latestJobsSql = `
@@ -384,6 +298,46 @@ function validHttpsUrl(value: string | undefined): string {
   }
 }
 
+function canonicalActionRequest(input: ActionInput): string {
+  return JSON.stringify({
+    action: input.action,
+    actor: input.actor,
+    blockedReason: input.blockedReason ?? null,
+    expectedVersion: input.expectedVersion,
+    externalUrl: input.externalUrl ?? null,
+    jobId: input.jobId,
+    scheduledAt: input.scheduledAt ?? null,
+  });
+}
+
+async function actionRequestFingerprint(input: ActionInput): Promise<string> {
+  const digest = await crypto.subtle.digest(
+    "SHA-256",
+    new TextEncoder().encode(canonicalActionRequest(input)),
+  );
+  return [...new Uint8Array(digest)]
+    .map((value) => value.toString(16).padStart(2, "0"))
+    .join("");
+}
+
+type StoredActionRequest = {
+  request_fingerprint: string;
+  response_json: string;
+};
+
+async function storedActionRequest(
+  idempotencyKey: string,
+): Promise<StoredActionRequest | null> {
+  return database()
+    .prepare(
+      `SELECT request_fingerprint, response_json
+       FROM action_requests
+       WHERE idempotency_key = ?`,
+    )
+    .bind(idempotencyKey)
+    .first<StoredActionRequest>();
+}
+
 export async function applyJobAction(input: ActionInput) {
   if (!input.jobId || !input.idempotencyKey) {
     throw new ActionError(400, "jobId and idempotencyKey are required");
@@ -393,14 +347,32 @@ export async function applyJobAction(input: ActionInput) {
   }
 
   const db = database();
-  const replay = await db
+  const fingerprint = await actionRequestFingerprint(input);
+  const storedRequest = await storedActionRequest(input.idempotencyKey);
+  if (storedRequest) {
+    if (storedRequest.request_fingerprint !== fingerprint) {
+      throw new ActionError(
+        409,
+        "The idempotency key is already bound to another action request",
+      );
+    }
+    return {
+      job: JSON.parse(storedRequest.response_json) as DistributionJob,
+      replayed: true,
+    };
+  }
+
+  const legacyReplay = await db
     .prepare(
       "SELECT job_id FROM distribution_events WHERE idempotency_key = ?",
     )
     .bind(input.idempotencyKey)
     .first<{ job_id: string }>();
-  if (replay) {
-    return { job: await latestJob(replay.job_id), replayed: true };
+  if (legacyReplay) {
+    throw new ActionError(
+      409,
+      "The idempotency key was used before request binding was enabled",
+    );
   }
 
   const current = await latestJob(input.jobId);
@@ -477,7 +449,7 @@ export async function applyJobAction(input: ActionInput) {
     if (
       current.assignee_email &&
       current.assignee_email !== input.actor &&
-      current.state === "CLAIMED"
+      ["CLAIMED", "SCHEDULED"].includes(current.state)
     ) {
       throw new ActionError(409, "Job is claimed by another team member");
     }
@@ -499,9 +471,24 @@ export async function applyJobAction(input: ActionInput) {
   }
 
   const nextSequence = Number(current.sequence) + 1;
+  const createdAt = new Date().toISOString();
+  const nextJob = mapJob({
+    ...current,
+    sequence: nextSequence,
+    state,
+    assignee_email: assignee,
+    claim_expires_at: claimExpiresAt,
+    blocked_reason: blockedReason,
+    scheduled_at: scheduledAt,
+    uploaded_at: uploadedAt,
+    external_url: externalUrl,
+    updated_at: createdAt,
+  });
+  const responseJson = JSON.stringify(nextJob);
   try {
-    await db
-      .prepare(
+    await db.batch([
+      db
+        .prepare(
         `INSERT INTO distribution_events(
           id, job_id, sequence, event_type, state, actor_email,
           assignee_email, claim_expires_at, blocked_reason, scheduled_at,
@@ -522,16 +509,44 @@ export async function applyJobAction(input: ActionInput) {
         uploadedAt,
         externalUrl,
         input.idempotencyKey,
-        new Date().toISOString(),
-      )
-      .run();
+        createdAt,
+      ),
+      db
+        .prepare(
+          `INSERT INTO action_requests(
+            idempotency_key, request_fingerprint, job_id, response_json, created_at
+          ) VALUES (?, ?, ?, ?, ?)`,
+        )
+        .bind(
+          input.idempotencyKey,
+          fingerprint,
+          input.jobId,
+          responseJson,
+          createdAt,
+        ),
+    ]);
   } catch (error) {
     const message = error instanceof Error ? error.message : "";
     if (message.includes("UNIQUE")) {
+      const concurrentReplay = await storedActionRequest(input.idempotencyKey);
+      if (concurrentReplay) {
+        if (concurrentReplay.request_fingerprint !== fingerprint) {
+          throw new ActionError(
+            409,
+            "The idempotency key is already bound to another action request",
+          );
+        }
+        return {
+          job: JSON.parse(
+            concurrentReplay.response_json,
+          ) as DistributionJob,
+          replayed: true,
+        };
+      }
       throw new ActionError(409, "Concurrent update detected; reload the job");
     }
     throw error;
   }
 
-  return { job: await latestJob(input.jobId), replayed: false };
+  return { job: nextJob, replayed: false };
 }

@@ -18,7 +18,7 @@ type ActionPayload = {
 
 export async function POST(request: Request) {
   try {
-    const identity = requestIdentity(request);
+    const identity = await requestIdentity(request);
     const payload = (await request.json()) as ActionPayload;
     const supported = new Set<JobAction>([
       "claim",
