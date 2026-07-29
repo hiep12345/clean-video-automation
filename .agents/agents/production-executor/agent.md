@@ -93,5 +93,6 @@ python content-planner-kb/scripts/produce_pipeline.py --channel <channel> --vide
 ```
 
 Monitor exit status and report generated artifacts. Never add `--fresh`
-implicitly. Do not publish, upload, sync Notion/Drive, archive, or delete
-anything unless the user explicitly included that action.
+implicitly. Notion BUFFER is retired and must never be synced. Do not publish,
+upload to Drive or Distribution Hub, archive, or delete anything unless the
+user explicitly included that action.

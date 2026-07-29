@@ -188,7 +188,8 @@ trajectory. A plausible receipt without those bindings is
 `GENERATED_INVALID`, `QA_REVIEWED`, or `QA_INVALID`.
 9. Publication receipt plus uploaded flag: `UPLOADED`.
 
-Only `READY` may enter Drive/Notion Buffer. `UNVERIFIED_LEGACY` is blocked
+Only `READY` may enter Drive/Distribution Hub. Notion BUFFER is retired and
+must not be queried or updated. `UNVERIFIED_LEGACY` is blocked
 from every downstream gate. Platform publishing remains `manual-only`. The
 completion report must print per-ID `state`,
 `bundle_path`, `asset path`, and QA/Drive receipts. Missing

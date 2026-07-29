@@ -5,7 +5,7 @@ assigns one primary agent per task and declares a non-overlapping write scope.
 
 | Agent | Primary use | Default repository | Allowed write scope | State-changing boundary |
 |---|---|---|---|---|
-| `analytics-manager` | Metrics and recommendations | `content-planner-kb` | Approved analytics report | Notion sync and archive require separate approval |
+| `analytics-manager` | Metrics and recommendations | `content-planner-kb` | Approved analytics report | Read-only analytics; Notion BUFFER is retired and forbidden |
 | `production-executor` | Approved media generation/render | `content-planner-kb`, `flowkit-engine` | One approved media output folder | Credit use, fresh generation, publish and upload require explicit approval |
 | `qa-engineer` | Software tests and regression | Task repository | Tests and fixtures only | Cannot edit production source |
 | `qa-reviewer` | L1/L2/L3 content-media QA | `content-planner-kb` | Approved QA report only | Cannot regenerate or publish |

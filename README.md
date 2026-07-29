@@ -37,8 +37,10 @@ powershell -ExecutionPolicy Bypass -File scripts/setup_git_hooks.ps1 -CheckOnly
 ## Shared integration configuration
 
 Copy `.env.example` to the workspace-root `.env` and keep real values local.
-Shared `NOTION_*`, `FB_APP_ID`, and `FB_APP_SECRET` settings belong in this
-root file, not inside either submodule. Google Drive OAuth files belong under
+Notion BUFFER is retired and must not be queried or updated; its legacy
+`NOTION_BUFFER_DB_ID` setting is not an operational integration. Settings for
+separate Notion Goal/Docs use cases, plus `FB_APP_ID` and `FB_APP_SECRET`,
+belong in this root file, not inside either submodule. Google Drive OAuth files belong under
 `.secrets/google-drive/` or at the paths configured by
 `GDRIVE_CREDENTIALS_FILE` and `GDRIVE_TOKEN_FILE`. Set
 `GDRIVE_PARENT_FOLDER_ID` to the exact writable destination folder; the
@@ -56,15 +58,17 @@ python content-planner-kb/scripts/facebook_config.py --page science-unlocked
 Facebook publishing is manual-only. Agents and automation may use the Page
 credential for sync/insights but cannot upload or publish Posts/Reels.
 
-Buffer publishing is fail-closed and dry-run by default:
+Distribution Hub ingest is fail-closed, exact-ID only, and dry-run by default:
 
 ```bash
-python content-planner-kb/scripts/publish_buffer.py --channel mt
-python content-planner-kb/scripts/publish_buffer.py --channel mt --apply
+python content-planner-kb/scripts/publish_buffer.py --channel mt --id <content-id>
+python content-planner-kb/scripts/publish_buffer.py --channel mt --id <content-id> --apply
 ```
 
-Only media with a QA PASS receipt and a verified Drive link can enter Notion
-with `Ready` status.
+Only media with a QA PASS receipt and a verified Drive link can enter
+Distribution Hub with `Ready` status. The `publish_buffer.py` filename is a
+legacy technical identifier retained for compatibility; it does not call
+Notion.
 
 ## Quy tắc Phát triển
 

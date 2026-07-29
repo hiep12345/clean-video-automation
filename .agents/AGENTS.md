@@ -80,10 +80,25 @@ tuyên bố đã dùng specialist.
 - Các database trong `.agents/state/` là trạng thái runtime cục bộ, không được
   stage hoặc commit.
 
+## Distribution Hub và Notion BUFFER
+
+- Notion BUFFER là hệ thống legacy đã retire. Mọi agent bị cấm chạy hoặc import
+  `content-planner-kb/scripts/notion_sync.py`, gọi Notion API để query/create/
+  update/archive BUFFER pages, hoặc dùng bảng `notion_manual_status` làm trạng
+  thái vận hành.
+- Yêu cầu “sync data”, “đưa bài lên hệ thống”, “cập nhật trạng thái upload” hoặc
+  tương đương phải được định tuyến sang Distribution Hub. Với production
+  pipeline, dùng `publish_buffer.py` với exact `--id`; với thao tác thành viên,
+  dùng API/UI của Distribution Hub.
+- `notion_manual_status` chỉ là snapshot audit lịch sử, không được refresh,
+  promote thành receipt hoặc dùng để ghi ngược trạng thái.
+- Các Notion database khác như Goal/Docs là phạm vi riêng. Không được suy luận
+  quyền dùng chúng từ một yêu cầu liên quan Distribution Hub.
+
 ## Nghiệm thu độc lập và bằng chứng QA
 
 - Agent tạo hoặc sửa media/content không được tự ký PASS cho chính artifact đó.
-- PASS mở khóa Drive, Notion Buffer hoặc publish phải do `qa-reviewer` độc lập
+- PASS mở khóa Drive, Distribution Hub hoặc publish phải do `qa-reviewer` độc lập
   kiểm tra đúng phiên bản artifact hiện tại.
 - QA ảnh/video phải mở từng artifact; không suy rộng kết quả từ một mẫu cho cả
   batch.
@@ -105,7 +120,9 @@ tuyên bố đã dùng specialist.
   morphology không có reference thực tế, hoặc thiếu tool receipt đều phải fail
   closed: `UNVERIFIED`/`Unsupported`, không PASS.
 - Chỉ artifact có `drive_buffer_eligible: true` trong QA gate receipt hợp lệ
-  mới được xem là đủ điều kiện cho bước Drive hoặc Notion Buffer. Receipt
+  mới được xem là đủ điều kiện cho bước Drive hoặc Distribution Hub. Tên trường
+  `drive_buffer_eligible` được giữ để tương thích schema cũ, không chỉ Notion.
+  Receipt
   không tự cấp quyền chạy upload/sync; quyền bên ngoài vẫn theo lệnh người dùng.
 - Với photo post, QA receipt schema-v5 chỉ tạo trạng thái `QA_REVIEWED` và luôn
   giữ `drive_buffer_eligible: false`. Điểm QA do code tính; agent không được

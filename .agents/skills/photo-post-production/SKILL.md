@@ -111,7 +111,7 @@ must fail closed.
      --channel <channel> --id <post-id> --json
    ```
 
-   Never write `Ready`, `Drive eligible`, or `Notion Buffer ready` unless this
+   Never write `Ready`, `Drive eligible`, or `Distribution Hub ready` unless this
    command returns `state: READY` and `ready: true`.
 6. Run independent hash-bound photo QA. Biology channels require a real-world
    morphology reference and accessible claim sources. Invalid dimensions,
@@ -139,8 +139,9 @@ must fail closed.
    then run `photo_post_accept.py`. Only a hash-bound ACCEPT receipt with zero
    critical defects moves the lifecycle to `READY`.
 8. `UNVERIFIED_LEGACY` is quarantine-only: it cannot enter QA, Drive,
-   Notion Buffer, or publication. Only `READY` may enter the existing
-   Drive/Notion gate. Facebook stays manual-only. After user-confirmed
+   Distribution Hub, or publication. Notion BUFFER is retired and must not be
+   queried or updated. Only `READY` may enter the existing
+   Drive/Distribution Hub gate. Facebook stays manual-only. After user-confirmed
    publication, use exact-ID reconciliation; do not infer publication or move
    folders by hand.
 
