@@ -22,9 +22,11 @@ node_modules/
 scratch/
 output/
 graphify-out/
-.agents/state/*.db*
-.agents/state/backups/
+.agents/state/
 test.png
+
+# Extracted standalone application (lives at ../distribution-hub)
+/distribution-hub/
 
 # OS generated files
 .DS_Store

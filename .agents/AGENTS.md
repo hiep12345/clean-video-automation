@@ -18,6 +18,28 @@ ghi một `WORKSPACE ACK` theo mẫu trong `AGENTS.md` ở root. ACK phải nêu
 Không tự suy đoán Git integrator. Nếu Codex hoặc agent khác đang giữ vai trò
 này, Antigravity 2 không được switch branch, stage, commit, rebase hay push.
 
+## Claim và team preflight bắt buộc
+
+`.agents/config/team-manifest.yaml` là registry máy đọc được cho role và risk
+tier. Trước hành động đầu tiên của specialist Tier 2/3, specialist phải chạy:
+
+```text
+python content-planner-kb/scripts/team_preflight.py \
+  --task <task-id> --role <role> \
+  --trajectory <ANTIGRAVITY_TRAJECTORY_ID> \
+  --resource <exact-resource-key> --claim --json
+```
+
+Preflight tự kiểm tra assignment, dependency, trajectory reuse và resource
+conflict, rồi chuyển task sang `IN_PROGRESS` bằng một transaction nguyên tử.
+Không được cập nhật `IN_PROGRESS` thủ công để thay thế claim. Lỗi CLI, task
+không tồn tại, role sai, dependency chưa xong hoặc claim thất bại đều là hard
+stop; parent không được tiếp tục bằng báo cáo thủ công.
+
+Specialist phải heartbeat cho task dài và giải phóng claim khi handoff. Trạng
+thái terminal tự giải phóng lock. Không kết nối SQLite trực tiếp; dùng
+`task_manager.py`.
+
 ## Vai trò điều phối chiến lược
 
 Antigravity 2 là **Strategic Coordinator** của phiên Antigravity, không phải
@@ -39,8 +61,10 @@ table, truyền mục tiêu hữu hạn, input đã biết, repository, task mod
 scope không chồng lấn. Parent không được chuyển toàn bộ trách nhiệm nghiệm thu
 cho specialist. Không delegate task nhỏ chỉ để hình thức.
 
-Nếu runtime không có `invoke_subagent`, parent phải nói rõ giới hạn này và tự
-thực hiện theo cùng ranh giới vai trò; không được tuyên bố đã dùng specialist.
+Nếu runtime không có `invoke_subagent`, parent chỉ được tự thực hiện task Tier
+0/1. Task Tier 2/3 cần production, QA độc lập, developer, software QA hoặc Git
+integration phải chuyển `BLOCKED`; parent không được tự đóng nhiều vai hoặc
+tuyên bố đã dùng specialist.
 
 ## Phối hợp
 
@@ -56,10 +80,25 @@ thực hiện theo cùng ranh giới vai trò; không được tuyên bố đã 
 - Các database trong `.agents/state/` là trạng thái runtime cục bộ, không được
   stage hoặc commit.
 
+## Distribution Hub và Notion BUFFER
+
+- Notion BUFFER là hệ thống legacy đã retire. Mọi agent bị cấm chạy hoặc import
+  `content-planner-kb/scripts/notion_sync.py`, gọi Notion API để query/create/
+  update/archive BUFFER pages, hoặc dùng bảng `notion_manual_status` làm trạng
+  thái vận hành.
+- Yêu cầu “sync data”, “đưa bài lên hệ thống”, “cập nhật trạng thái upload” hoặc
+  tương đương phải được định tuyến sang Distribution Hub. Với production
+  pipeline, dùng `publish_buffer.py` với exact `--id`; với thao tác thành viên,
+  dùng API/UI của Distribution Hub.
+- `notion_manual_status` chỉ là snapshot audit lịch sử, không được refresh,
+  promote thành receipt hoặc dùng để ghi ngược trạng thái.
+- Các Notion database khác như Goal/Docs là phạm vi riêng. Không được suy luận
+  quyền dùng chúng từ một yêu cầu liên quan Distribution Hub.
+
 ## Nghiệm thu độc lập và bằng chứng QA
 
 - Agent tạo hoặc sửa media/content không được tự ký PASS cho chính artifact đó.
-- PASS mở khóa Drive, Notion Buffer hoặc publish phải do `qa-reviewer` độc lập
+- PASS mở khóa Drive, Distribution Hub hoặc publish phải do `qa-reviewer` độc lập
   kiểm tra đúng phiên bản artifact hiện tại.
 - QA ảnh/video phải mở từng artifact; không suy rộng kết quả từ một mẫu cho cả
   batch.
@@ -81,8 +120,16 @@ thực hiện theo cùng ranh giới vai trò; không được tuyên bố đã 
   morphology không có reference thực tế, hoặc thiếu tool receipt đều phải fail
   closed: `UNVERIFIED`/`Unsupported`, không PASS.
 - Chỉ artifact có `drive_buffer_eligible: true` trong QA gate receipt hợp lệ
-  mới được xem là đủ điều kiện cho bước Drive hoặc Notion Buffer. Receipt
+  mới được xem là đủ điều kiện cho bước Drive hoặc Distribution Hub. Tên trường
+  `drive_buffer_eligible` được giữ để tương thích schema cũ, không chỉ Notion.
+  Receipt
   không tự cấp quyền chạy upload/sync; quyền bên ngoài vẫn theo lệnh người dùng.
+- Với photo post, QA receipt schema-v5 chỉ tạo trạng thái `QA_REVIEWED` và luôn
+  giữ `drive_buffer_eligible: false`. Điểm QA do code tính; agent không được
+  truyền điểm. Chỉ coordinator acceptance ở trajectory thứ ba, đã mở đúng
+  artifact/reference bằng `view_file` và khớp hash, mới chuyển `READY` và cấp
+  eligibility hiệu lực. Reference sinh học schema-v1, ảnh schematic hoặc file
+  không được tạo bởi `photo_reference_import.py` đều bị quarantine.
 - Không chạy upload hoặc sync để “thử” một artifact chưa qua gate. Dry-run
   không thay thế QA.
 
@@ -106,10 +153,17 @@ trực tiếp trong working tree hiện tại.
 Với task có ghi code/config/tài liệu:
 
 - tạo task tracker với `--git-required`, repository, branch và write scope;
-- chỉ bàn giao kết quả cho Git integrator, không tự gọi `closeout`;
+- developer bàn giao kết quả cho `qa-engineer`, sau đó
+  `repository-integrator`; không agent nào tự kiểm tra và tự closeout thay đổi
+  của chính mình;
+- chỉ task gán chính xác cho `repository-integrator` mới có quyền stage, commit,
+  push feature branch và gọi `closeout`;
 - không báo `COMPLETED` khi chưa có commit/push evidence;
-- nếu Git integrator chưa sẵn sàng, giữ task `IN_PROGRESS` và không bắt đầu một
-  write task không liên quan trong cùng repository.
+- nếu thiếu role bắt buộc, giữ task `BLOCKED`; không bắt đầu write task chồng
+  scope trong cùng repository.
+
+`repository-integrator` không được sửa source, bypass hook, merge, rebase,
+force-push hoặc dùng `git add .`. Merge luôn cần lệnh riêng của người dùng.
 
 ## Đồng bộ sau khi rewrite Git history
 

@@ -21,15 +21,19 @@ photo folders. Facebook publishing remains manual-only.
 ## Agent routing
 
 1. The Antigravity parent remains Strategic Coordinator.
-2. For a complex batch, invoke `analytics-manager` in read-only mode to inspect
-   current Facebook/local/Buffer state for the exact IDs.
+2. For a complex batch, create a tracker task assigned to `analytics-manager`,
+   invoke it in read-only mode, and require a successful team preflight claim
+   before inspecting current Facebook/local/Buffer state for the exact IDs.
 3. After explicit approval, invoke `system-developer` in write-scoped mode for
    only:
    - the exact photo folders;
    - `.agents/state/channel.db` and its backup;
    - publication receipts created by the deterministic reconciliation tool.
-4. Neither specialist receives Git authority. The parent verifies all receipts,
-   paths and database status after execution.
+   The write specialist must claim `external:facebook-reconcile:<channel>` and
+   exact `artifact:<channel>:<id>` resources through `team_preflight.py`.
+4. Neither specialist receives Git authority. A failed tracker/preflight call
+   blocks reconciliation; the parent cannot replace the specialist. The parent
+   verifies all receipts, paths and database status after execution.
 
 ## Photo workflow
 

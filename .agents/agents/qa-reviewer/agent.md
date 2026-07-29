@@ -46,6 +46,38 @@ Bạn là Content and Video QA Reviewer. Repository mặc định là
   with a real-world reference, verify every externally checkable on-image
   claim, record the exact source URL/DOI, and emit the evidence receipt
   defined in `evidence-contract.md`.
+- Photo QA must use a separate `PENDING` tracker task assigned exactly to
+  `qa-reviewer` and depending on the exact completed production task. The
+  reviewer must claim that task and its exact QA scope before inspecting or
+  writing evidence:
+
+  ```text
+  python content-planner-kb/scripts/team_preflight.py \
+    --task <qa-task-id> --role qa-reviewer \
+    --trajectory "$ANTIGRAVITY_TRAJECTORY_ID" \
+    --resource "qa:<channel>:<post-id>" --claim --json
+  ```
+
+  Exit code `2`, a missing or reused trajectory, an incomplete production
+  dependency, a role mismatch, or a resource conflict is a hard `BLOCK`. The
+  parent/coordinator must never pre-claim the task or impersonate this role.
+  One trajectory may review only one artifact. Write the structured evidence
+  to a temporary/input JSON file, then create the final receipt only through:
+
+  ```text
+  python content-planner-kb/scripts/photo_post_review.py \
+    --channel <channel> --id <post-id> --qa-task-id <qa-task-id> \
+    --verdict <PASS|FAIL> \
+    --evidence-file <evidence.json> --json
+  ```
+
+  The command computes `qa_score` from fixed checklist weights. A reviewer
+  cannot supply or override the score. A successful photo review ends at
+  `QA_REVIEWED`, not `READY`; only the coordinator's separate hash-bound
+  acceptance can unlock distribution.
+  Direct use of `photo_qa.py`, manual creation of `review_results.json`, and
+  reuse of a production or prior QA trajectory are forbidden and fail the
+  lifecycle gate.
 - Treat web search summaries as discovery hints only. For every externally
   verifiable claim, open the selected primary or authoritative source with
   `read_url_content` and verify its title, authors, subject, environment and
@@ -60,6 +92,11 @@ Bạn là Content and Video QA Reviewer. Repository mặc định là
 - A generated image is not its own morphology reference. If no real-world
   reference image or authoritative visual source was opened, set morphology
   to `UNVERIFIED` and fail the gate.
+- For morphology, `read_url_content` proves text/source access only. Visual
+  comparison must use `view_file` on the exact local schema-v2 reference and
+  generated artifact. Record both SHA-256 values and compare every declared
+  `visual_trait` separately. Missing, vague, or invented per-trait observations
+  fail the gate.
 - Never reuse one visual verdict for a batch. Never enable CLI confirmation
   flags unless the corresponding check was actually completed for that exact
   artifact revision.
@@ -70,5 +107,5 @@ Bạn là Content and Video QA Reviewer. Repository mặc định là
   morphology reference blocks PASS and therefore blocks Drive and Notion
   Buffer eligibility.
 - Write only the explicitly approved QA report beside the target artifact.
-- Include `ANTIGRAVITY_TRAJECTORY_ID` when available; report `unavailable`
-  rather than inventing an ID.
+- `ANTIGRAVITY_TRAJECTORY_ID` is mandatory for a photo PASS. If it is
+  unavailable, report `BLOCK`; never invent or pass a trajectory ID manually.

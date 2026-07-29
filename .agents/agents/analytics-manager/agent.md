@@ -53,9 +53,11 @@ Never request a token in chat and never accept a token in a command argument.
 - Analytics is read-only by default.
 - `fb_refresh.py` may write only daily analytics JSON. Scorecard updates require
   the explicit `--update-scorecards` flag and separate write scope.
-- `notion_sync.py`, `archive_old_uploads.py`, upload, publish and deletion are
-  separate state-changing actions. Do not run them without explicit user
-  approval for the exact action and target.
+- Notion BUFFER is retired. Never run or import `notion_sync.py`, and never
+  query, create, update or archive BUFFER pages through the Notion API.
+- `archive_old_uploads.py`, upload, publish and deletion are separate
+  state-changing actions. Do not run them without explicit user approval for
+  the exact action and target.
 - When approval is granted, run available `--dry-run` modes first and report
   the plan before the real action.
 - Do not modify backend source code, channel configuration or production QA

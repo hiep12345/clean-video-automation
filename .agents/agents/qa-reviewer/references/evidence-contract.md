@@ -65,22 +65,106 @@ is `Unsupported` unless a source studying aerial emersion is opened.
 
 ## Morphology receipt
 
-Open the generated artifact and a real-world reference separately.
+Open the generated artifact and every local schema-v2 reference separately.
+`read_url_content` can verify a source page or scientific claim, but it is not
+visual evidence and cannot satisfy this receipt.
 
 ```text
 MORPHOLOGY EVIDENCE RECEIPT
 artifact_opened: true | false
+artifact_tool: view_file | unavailable
 artifact_path: <local artifact>
-reference_opened: true | false
-reference_tool: read_url_content | view_file | unavailable
-reference_source_url: <authoritative visual source or none>
-reference_identity: <scientific/common name and identifying traits>
-traits_compared: <visible traits compared one by one>
+artifact_sha256: <exact generated artifact hash>
+reference_checks:
+  - reference_file: <exact local file from reference_pack.json>
+    reference_sha256: <exact local reference hash>
+    reference_opened: true | false
+    reference_tool: view_file | unavailable
+    reference_source_url: <source page or direct asset URL from the pack>
+    scientific_name: <identity from the pack>
+    depicted_view: <view from the pack>
+    traits_compared:
+      - trait: <exact visual_trait from the pack>
+        artifact_observation: <specific visible observation>
+        reference_observation: <specific visible observation>
+        verdict: MATCH | NEEDS FIX
 verdict: MATCH | NEEDS FIX | UNVERIFIED
 ```
 
-If `reference_opened` is not true, morphology is `UNVERIFIED`. Do not infer a
-reference comparison from the generated artifact alone.
+Every declared trait must have two specific observations and `MATCH`. The file
+names and hashes must match the current generation/reference pack. Boolean
+claims without this structure are invalid.
+
+## Runtime provenance receipt
+
+Photo QA is valid only when the final receipt is created by
+`photo_post_review.py`. The receipt must contain:
+
+```text
+RUNTIME QA PROVENANCE
+qa_task_id: <tracker task assigned to qa-reviewer>
+reviewer_role: qa-reviewer
+reviewer_trajectory_id: <current ANTIGRAVITY_TRAJECTORY_ID>
+production_task_id: <exact completed production dependency>
+producer_trajectory_id: <trajectory from generation receipt>
+generation_receipt_sha256: <reviewed generation receipt hash>
+```
+
+The QA task and production task must differ. Their trajectories must differ,
+and a trajectory cannot be reused for another artifact task. The production
+receipt hash must already be bound to the production task. After QA, the
+review receipt hash is bound to the QA task before that task is completed.
+Missing or conflicting tracker evidence is `BLOCK`, even when the JSON schema,
+score, and asset hashes look valid.
+
+For `photo_post_review.py`, place the claim receipts, morphology receipt,
+confirmations, and exact visual/text observations in the supplied evidence
+JSON. Do not replace structured claim receipts with a list of URLs.
+
+The reviewer does not provide a numeric score. Schema-v5 computes it from fixed
+weights and stores `score_mode: machine-computed-v1`. A critical failed check
+caps the computed result at 5.9. A valid QA receipt grants `QA_REVIEWED` only
+and keeps `drive_buffer_eligible: false`.
+
+## Parent acceptance receipt
+
+After QA completes, the coordinator opens the exact artifact and, for biology,
+every exact local reference. It then supplies a separate evidence JSON to:
+
+```text
+python content-planner-kb/scripts/photo_post_accept.py \
+  --channel <channel> --id <post-id> --decision ACCEPT \
+  --evidence-file <parent-evidence.json> --json
+```
+
+The parent evidence JSON uses this shape:
+
+```text
+artifact_opened: true
+artifact_tool: view_file
+artifact_path: <exact generated filename>
+critical_defects: 0
+findings:
+  - <specific artifact finding>
+reference_checks:
+  - reference_file: <exact schema-v2 local file>
+    opened: true
+    tool: view_file
+    sha256: <exact local hash>
+    verdict: MATCH
+    observation: <specific overall observation>
+    trait_findings:
+      - trait: <exact visual_trait>
+        observation: <independent specific observation>
+        verdict: MATCH
+```
+
+The coordinator trajectory must differ from production and QA. The evidence
+must use `view_file`, contain exact artifact/reference hashes, zero critical
+defects, specific findings, and an independent `trait_findings` entry with a
+specific observation and `MATCH` for every reference `visual_trait`.
+Only this second key can set effective `drive_buffer_eligible: true` and move
+the lifecycle from `QA_REVIEWED` to `READY`.
 
 ## Report gate
 

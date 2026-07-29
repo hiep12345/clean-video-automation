@@ -1,0 +1,117 @@
+{
+  "schema_version": 1,
+  "team": "antigravity-autonomous-team",
+  "default_host": "antigravity-2",
+  "default_lease_minutes": 15,
+  "risk_tiers": {
+    "0": {
+      "description": "Read-only explanation or inspection",
+      "parent_fallback_allowed": true
+    },
+    "1": {
+      "description": "Bounded low-risk operation",
+      "parent_fallback_allowed": true
+    },
+    "2": {
+      "description": "Media/content production with independent QA",
+      "parent_fallback_allowed": false
+    },
+    "3": {
+      "description": "Code, configuration, schema, or Git mutation",
+      "parent_fallback_allowed": false
+    }
+  },
+  "roles": {
+    "coordinator": {
+      "risk_tier": 0,
+      "write_scope_required": false,
+      "independent_trajectory": false,
+      "git_authority": "none"
+    },
+    "analytics-manager": {
+      "risk_tier": 1,
+      "write_scope_required": false,
+      "independent_trajectory": false,
+      "git_authority": "none"
+    },
+    "production-executor": {
+      "risk_tier": 2,
+      "write_scope_required": true,
+      "independent_trajectory": false,
+      "verified_by": "qa-reviewer",
+      "git_authority": "none"
+    },
+    "qa-reviewer": {
+      "risk_tier": 2,
+      "write_scope_required": true,
+      "independent_trajectory": true,
+      "git_authority": "none"
+    },
+    "script-writer": {
+      "risk_tier": 2,
+      "write_scope_required": true,
+      "independent_trajectory": false,
+      "verified_by": "qa-reviewer",
+      "git_authority": "none"
+    },
+    "system-developer": {
+      "risk_tier": 3,
+      "write_scope_required": true,
+      "independent_trajectory": false,
+      "verified_by": "qa-engineer",
+      "handed_to": "repository-integrator",
+      "git_authority": "none"
+    },
+    "web-developer": {
+      "risk_tier": 3,
+      "write_scope_required": true,
+      "independent_trajectory": false,
+      "verified_by": "qa-engineer",
+      "handed_to": "repository-integrator",
+      "git_authority": "none"
+    },
+    "qa-engineer": {
+      "risk_tier": 3,
+      "write_scope_required": true,
+      "independent_trajectory": true,
+      "handed_to": "repository-integrator",
+      "git_authority": "none"
+    },
+    "repository-integrator": {
+      "risk_tier": 3,
+      "write_scope_required": true,
+      "independent_trajectory": true,
+      "git_authority": "feature_branch_only",
+      "requires": [
+        "git_required_task",
+        "implementation_handoff",
+        "tests_passed",
+        "diff_reviewed",
+        "hooks_passed"
+      ]
+    }
+  },
+  "workflow_contracts": {
+    "photo-post-production": {
+      "sequential": true,
+      "roles": [
+        "production-executor",
+        "qa-reviewer"
+      ],
+      "distinct_trajectories": true,
+      "machine_computed_qa_score": true,
+      "parent_acceptance_required": true,
+      "reference_pack_schema": 2,
+      "stop_on_first_failed_gate": true
+    },
+    "code-change": {
+      "roles": [
+        "system-developer",
+        "qa-engineer",
+        "repository-integrator"
+      ],
+      "distinct_trajectories": true,
+      "git_closeout_required": true
+    }
+  }
+}

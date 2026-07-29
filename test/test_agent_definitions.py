@@ -20,6 +20,11 @@ EXPECTED_TOOLS = {
         "write_to_file",
     },
     "production-executor": {"view_file", "run_command"},
+    "repository-integrator": {
+        "view_file",
+        "grep_search",
+        "run_command",
+    },
     "qa-engineer": {
         "view_file",
         "grep_search",
@@ -114,11 +119,16 @@ class AgentDefinitionTests(unittest.TestCase):
                 self.assertIn("# Agent System Instructions", text)
                 self.assertIn("Read `AGENTS.md`", text)
                 self.assertIn("`WORKSPACE ACK`", text)
-                self.assertIn("Git authority: none", text)
                 self.assertIn("Task mode:", text)
                 self.assertNotIn("Git integrator: Không có — read-only", text)
                 self.assertIn("dirty", text.lower())
-                self.assertRegex(text, r"Never (mutate Git|switch branches)")
+                if path.parent.name == "repository-integrator":
+                    self.assertIn("Git authority: repository-integrator", text)
+                    self.assertIn("Task mode: write-scoped", text)
+                    self.assertIn("Never switch branches", text)
+                else:
+                    self.assertIn("Git authority: none", text)
+                    self.assertRegex(text, r"Never (mutate Git|switch branches)")
 
     def test_no_known_stale_paths_or_encoding_damage(self):
         """Definitions must route through current repositories and valid UTF-8."""
@@ -144,7 +154,11 @@ class AgentDefinitionTests(unittest.TestCase):
         routed = re.findall(r"^\| `([^`]+)` \|", routing, flags=re.MULTILINE)
         self.assertEqual(set(routed), set(EXPECTED_TOOLS))
         self.assertEqual(len(routed), len(set(routed)))
-        self.assertIn("No specialized agent is Git integrator", routing)
+        self.assertIn(
+            "No specialist has Git authority except a task explicitly assigned",
+            routing,
+        )
+        self.assertIn("`repository-integrator`", routing)
         adapter = (ROOT / ".agents" / "AGENTS.md").read_text(encoding="utf-8")
         self.assertIn(".agents/config/agent-routing.md", adapter)
 
