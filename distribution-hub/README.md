@@ -4,6 +4,8 @@ Distribution Hub is the manual publishing control plane for the content
 production system. It gives team members a Notion-like queue while keeping
 operational state behind exact, versioned API actions.
 
+Production: <https://hub.growthu.space/>
+
 The application does **not** publish to Facebook, Instagram, YouTube, or Amazon.
 Team members publish manually and then record the receipt URL in Distribution
 Hub. Notion is a frozen legacy reference only: Distribution Hub does not read
@@ -56,17 +58,9 @@ change an uploaded job to `BLOCKED`.
 
 `POST /api/aliases/ingest` accepts idempotent Facebook Graph mappings from the
 same allowlisted Cloudflare Access service identity used by production ingest.
-The companion command is dry-run by default:
-
-```powershell
-python content-planner-kb/scripts/distribution_hub_meta_sync.py
-```
-
-After reviewing its exact `MAPPED` rows, send them with:
-
-```powershell
-python content-planner-kb/scripts/distribution_hub_meta_sync.py --apply
-```
+The resolver client belongs to the external production pipeline repository and
+is dry-run by default. This repository owns the receiving API contract, not the
+pipeline implementation.
 
 Rows without a Hub job or without a member receipt are reported as `NO_JOB` or
 `NO_RECEIPT`; they are never guessed or attached by title.
@@ -105,6 +99,20 @@ administrators. The legacy single-value `DISTRIBUTION_ADMIN_EMAIL` remains
 supported. Additional members are provisioned through the Team panel; their
 emails and channel assignments are never hard-coded in source.
 
+## Repository boundary
+
+This is a standalone application repository. It owns:
+
+- the web interface and authenticated API routes;
+- the Cloudflare Worker and custom-domain configuration;
+- D1 schema, migrations, and operational state transitions;
+- tests for access control, idempotency, receipts, and UI contracts.
+
+Content creation, Google Drive delivery, analytics collection, and retry
+outboxes belong to external production systems. Those systems integrate only
+through the versioned `/api/ingest` and `/api/aliases/ingest` contracts. The Hub
+does not import files or Python modules from another repository.
+
 ## Direct production ingest
 
 `POST /api/ingest` accepts schema version `1` photo content from the exact
@@ -124,32 +132,10 @@ service identity whose Client ID appears in the comma-separated
 `DISTRIBUTION_INGEST_SERVICE_IDS` Worker variable. A browser/user identity
 cannot call it.
 
-The transition bridge is dry-run by default and reads the existing local
-production artifacts directly without importing any Notion module:
-
-```powershell
-python scripts/sync_workspace_content.py `
-  --id bk-photo-bk-p010-kalanchoe-pet-toxicity
-```
-
-To apply an exact-ID batch:
-
-```powershell
-$env:CLOUDFLARE_ACCESS_CLIENT_ID = "<service-token-client-id>"
-$env:CLOUDFLARE_ACCESS_CLIENT_SECRET = "<service-token-client-secret>"
-python scripts/sync_workspace_content.py --apply `
-  --id bk-photo-bk-p010-kalanchoe-pet-toxicity
-```
-
-The service-token secret belongs only in the execution environment. Never put
-it in this repository, Wrangler variables, logs, or documentation.
-
-Pending batches can be retried explicitly:
-
-```powershell
-python ../content-planner-kb/scripts/distribution_hub_sync.py `
-  --flush-pending --apply
-```
+External clients must keep service-token secrets only in their execution
+environment, send stable idempotency keys, and retain failed batches in their
+own retry outbox. Never put credentials, client outboxes, or production
+databases in this repository.
 
 ## Cloudflare Free deployment
 
@@ -158,7 +144,7 @@ The same build can run directly on Cloudflare Workers with D1. The tracked
 existing OpenAI Sites project.
 
 1. Authenticate Wrangler and create the D1 database named `distribution-hub`.
-2. Replace `REPLACE_WITH_D1_DATABASE_ID` in `wrangler.cloudflare.jsonc`.
+2. Bind the D1 database in `wrangler.cloudflare.jsonc`.
 3. Store `DISTRIBUTION_ADMIN_EMAILS` as a Worker secret or runtime value.
 4. Create an Access service token, add a Service Auth policy for that exact
    token, and set its Client ID in `DISTRIBUTION_INGEST_SERVICE_IDS`.

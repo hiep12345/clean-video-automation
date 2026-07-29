@@ -104,13 +104,9 @@ test("Cloudflare Access and OpenAI Sites identities are isolated by provider", a
 });
 
 test("production content enters D1 directly without a Notion runtime bridge", async () => {
-  const [route, ingest, bridge, control, readme] = await Promise.all([
+  const [route, ingest, control, readme] = await Promise.all([
     readFile(new URL("../app/api/ingest/route.ts", import.meta.url), "utf8"),
     readFile(new URL("../db/ingest.ts", import.meta.url), "utf8"),
-    readFile(
-      new URL("../scripts/sync_workspace_content.py", import.meta.url),
-      "utf8",
-    ),
     readFile(new URL("../db/control.ts", import.meta.url), "utf8"),
     readFile(new URL("../README.md", import.meta.url), "utf8"),
   ]);
@@ -136,10 +132,11 @@ test("production content enters D1 directly without a Notion runtime bridge", as
   assert.match(ingest, /content_ingest_records/);
   assert.match(ingest, /ingest_batches/);
   assert.doesNotMatch(ingest, /notion|Buffer Status/i);
-  assert.doesNotMatch(bridge, /import\s+notion_sync|from\s+notion_sync/i);
   assert.doesNotMatch(control, /seedContent|demo-photo|demo-video/i);
   assert.match(readme, /does not read[\s\S]*write to it[\s\S]*mirror statuses/i);
   assert.match(readme, /only operational source of truth/i);
+  assert.match(readme, /standalone application repository/i);
+  assert.match(readme, /does not import files or Python modules/i);
 });
 
 test("ingest service identities are signed and explicitly allowlisted", async () => {
