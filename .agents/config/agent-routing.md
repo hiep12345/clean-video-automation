@@ -6,7 +6,7 @@ assigns one primary agent per task and declares a non-overlapping write scope.
 | Agent | Primary use | Default repository | Allowed write scope | State-changing boundary |
 |---|---|---|---|---|
 | `analytics-manager` | Metrics and recommendations | `content-planner-kb` | Approved analytics report | Notion sync and archive require separate approval |
-| `production-executor` | Approved media generation/render | `content-planner-kb`, `flowkit-engine` | One video output folder | Credit use, fresh generation, publish and upload require explicit approval |
+| `production-executor` | Approved media generation/render | `content-planner-kb`, `flowkit-engine` | One approved media output folder | Credit use, fresh generation, publish and upload require explicit approval |
 | `qa-engineer` | Software tests and regression | Task repository | Tests and fixtures only | Cannot edit production source |
 | `qa-reviewer` | L1/L2/L3 content-media QA | `content-planner-kb` | Approved QA report only | Cannot regenerate or publish |
 | `script-writer` | Script, prompts and metadata | `content-planner-kb` | One designated `script.md` | Cannot publish or invent unsupported facts |
@@ -27,15 +27,15 @@ assigns one primary agent per task and declares a non-overlapping write scope.
   trajectory, incomplete dependency, or resource conflict is a hard stop.
 - Use independent roles for implementation and verification. The agent that
   generates or edits an artifact cannot approve its publication gate.
-- For photo posts, the parent creates two tracker tasks per ID:
-  `<post-id>-production` assigned to `production-executor`, then
-  `<post-id>-qa` assigned to `qa-reviewer` with an exact dependency on the
-  production task. Invoke a new trajectory for each task. The parent may
-  coordinate these tasks but may not run either specialist receipt-writing
-  command itself. After QA reaches `QA_REVIEWED`, the parent opens the exact
-  artifact and references itself and writes only the separate coordinator
-  acceptance through `photo_post_accept.py`; this second key is required for
-  `READY`.
+- For photo posts, the parent compiles the contract-bound production work order.
+  The compiler atomically creates or verifies the canonical
+  `<post-id>-production` and dependent `<post-id>-qa` tasks, preserving their
+  current status on repeated calls. The parent dispatches the returned work
+  orders with a new trajectory for each task; it must not create versioned
+  replacements or run either specialist receipt-writing command itself. After
+  QA reaches `QA_REVIEWED`, the parent opens the exact artifact and references
+  itself and writes only the separate coordinator acceptance through
+  `photo_post_accept.py`; this second key is required for `READY`.
 - Do not invoke a specialist for a trivial task or claim delegation when the
   runtime did not expose the invocation tool.
 - Parent fallback is allowed only for Tier 0/1. If the runtime cannot invoke a

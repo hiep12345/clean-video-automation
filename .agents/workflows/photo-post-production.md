@@ -30,20 +30,31 @@ Obsidian as an intake folder or manually copy drafts into the vault.
 
 ## Entry gates and state
 
-The only user-facing production command is the single-ID orchestrator:
+The coordinator starts each stage by compiling one minimal, contract-bound work
+order:
 
 ```text
-python content-planner-kb/scripts/photo_post_produce.py \
-  --channel <channel> --id <post-id> --json
+python content-planner-kb/scripts/photo_post_work_order.py \
+  --channel <channel> --id <post-id> --stage production --json
 ```
 
-Add `--execute-flowkit` only after the reference pack has been curated and the
-user has authorized the FlowKit run through the Google Labs execution path.
+This local command resolves the profile, runs preflight, compiles the immutable
+production contract, and atomically ensures the canonical
+`<post-id>-production` and `<post-id>-qa` tasks. Repeating it returns the same
+tasks; never create `-v2`, `-v3`, or other retry task identities. The specialist
+receives only the returned work order, claims its declared task/resources, and
+runs its declared command.
+
+Compiling a work order is local and does not consume generation credit. The
+production command emitted by the work order includes `--execute-flowkit` and
+may run only when the user has authorized generation through the Google Labs
+execution path. Contract drift is rejected before reference upload or provider
+generation. Never substitute a paid external generation API.
+
 The orchestrator performs preflight, materialization, reference validation,
 FlowKit request, asset validation, and receipt-backed state transitions in that
 order. Direct calls to `batch_gen.py` or `gen_image_post.py` are implementation
-details and are not valid workflow steps. Never substitute a paid external
-generation API.
+details and are not valid workflow steps.
 
 ### Channel contracts
 
@@ -87,11 +98,12 @@ Example: `Sản xuất 5 photo MT`.
 
 Antigravity 2 must treat this as a coordinator shorthand, not ask the operator
 to restate paths, commands, QA rules, or storage rules. Expand it into a
-sequential list of unique post IDs. For each ID, create the intake draft, run
-preflight, call the single-ID orchestrator, request independent QA for the
-exact asset revision, and read lifecycle status. Do not generate in parallel,
-do not run a runtime reset/archive during the production run, and stop on the
-first failed gate unless the user explicitly requests continue-on-error.
+sequential list of unique post IDs. For each ID, create the intake draft,
+compile the production work order, dispatch its production specialist, compile
+the QA work order after production completes, dispatch a fresh QA trajectory,
+and read lifecycle status. Do not generate in parallel, do not run a runtime
+reset/archive during the production run, and stop on the first failed gate
+unless the user explicitly requests continue-on-error.
 
 The completion report must be per ID. Only `READY` IDs count as completed;
 missing or stale evidence is a blocker, never a batch-level PASS.
@@ -113,9 +125,12 @@ is `UNVERIFIED`, never generated. A missing/unknown/retired format fails closed.
 7. Quarantined asset without verified provenance: `UNVERIFIED_LEGACY`.
 8. Hash-bound QA plus independent coordinator acceptance: `READY`.
 
-For every generated ID, the coordinator creates a `PENDING` task assigned to
-`production-executor` and invokes that sub-agent. The specialist, not the
-parent, atomically starts the task:
+For every generated ID, the production work order atomically creates the
+canonical task assigned to `production-executor` initially as `PENDING`.
+Repeated compilation preserves that task's identity and current status. The
+coordinator must not create a versioned substitute. The specialist, not the
+parent, atomically starts the task using the task ID and exact resources
+returned by the work order:
 
 ```text
 python content-planner-kb/scripts/team_preflight.py \
@@ -129,10 +144,17 @@ python content-planner-kb/scripts/team_preflight.py \
 
 Only after this passes may it call
 `photo_post_produce.py --execute-flowkit --production-task-id ...`.
-After generation completes, the coordinator creates a dependent `PENDING` QA
-task assigned to `qa-reviewer` and invokes a fresh trajectory. That specialist
-must claim a distinct QA resource before using
-`photo_post_review.py --qa-task-id ...`:
+After generation completes, the coordinator compiles the QA work order:
+
+```text
+python content-planner-kb/scripts/photo_post_work_order.py \
+  --channel <channel> --id <post-id> --stage qa --json
+```
+
+It returns the already-bound dependent QA task assigned to `qa-reviewer`,
+created initially as `PENDING` and otherwise preserving its current status.
+The coordinator invokes a fresh trajectory, and that specialist must claim the
+returned QA resource before running the returned review command:
 
 ```text
 python content-planner-kb/scripts/team_preflight.py \
@@ -158,7 +180,7 @@ python content-planner-kb/scripts/photo_post_accept.py \
 ```
 
 `READY` requires all of the following at the same revision: schema-v2
-real-photo reference evidence where configured, FlowKit media IDs, schema-v2
+real-photo reference evidence where configured, FlowKit media IDs, schema-v4
 generation receipt, production task/trajectory binding, schema-v5
 machine-scored QA receipt, distinct dependent QA task/trajectory binding,
 tracker-bound receipt hashes, and a parent acceptance hash-bound by a third

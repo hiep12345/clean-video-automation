@@ -72,17 +72,26 @@ must fail closed.
 1. Write the unvalidated editorial draft at `content-planner-kb/intake/photo-posts/<channel>/<post-id>.md`.
    Its only valid state is `DRAFT` after preflight passes. Never write drafts
    into `obsidian-kb/`; that vault is curated, validated knowledge.
-2. Run the single production orchestrator. It owns materialization, reference
-   validation, FlowKit generation, hash-bound generation receipt, and state:
+2. Compile the minimal production work order:
 
    ```text
-   python content-planner-kb/scripts/photo_post_produce.py \
-     --channel <channel> --id <post-id> --json
+   python content-planner-kb/scripts/photo_post_work_order.py \
+     --channel <channel> --id <post-id> --stage production --json
    ```
 
-3. For an explicitly user-authorized FlowKit run through the Google Labs
-   execution path, add `--execute-flowkit`. The
-   command uploads only curated reference files recorded in the bundle's
+   This local command resolves the profile, runs preflight, compiles the
+   contract, and atomically ensures the canonical `<post-id>-production` and
+   `<post-id>-qa` task pair. Repeated calls return the same task identities;
+   never create `-v2`, `-v3`, or other retry tasks. Give the specialist only
+   the returned work order, not the full policy stack.
+3. The production specialist claims the returned task/resources and runs the
+   returned orchestrator command. For an explicitly user-authorized FlowKit run
+   through the Google Labs execution path, that command uses
+   `--execute-flowkit`. Contract drift fails before any reference upload or
+   provider generation. Work-order compilation is local and consumes no
+   generation credit; actual Google Labs generation may use the user's account
+   allowance. Do not substitute a paid external AI API. The production command
+   uploads only curated reference files recorded in the bundle's
    `references/reference_pack.json`, then sends their FlowKit media IDs with
    the prompt. Biology references must be imported first through
    `photo_reference_import.py`; manual pack entries, schema-v1 packs,
@@ -108,12 +117,15 @@ must fail closed.
    morphology reference and accessible claim sources. Invalid dimensions,
    missing FlowKit provenance, or missing receipts produce
    `GENERATED_INVALID`/`QA_INVALID`, not `READY`.
-   Production and QA are separate tracker tasks and separate Antigravity
-   trajectories. Create both tasks as `PENDING`; each specialist must atomically
-   start its own task with `team_preflight.py --claim`, exact role, current
-   trajectory and non-overlapping resource keys. Pass the production task to
-   `photo_post_produce.py --production-task-id`; create the final review only
-   with `photo_post_review.py --qa-task-id`. Do not pass a numeric score:
+   Production and QA are separate canonical tracker tasks and separate
+   Antigravity trajectories. The work-order compiler creates missing tasks
+   initially as `PENDING`; repeated compilation preserves each task's identity
+   and current status. Coordinators must not create versioned replacements.
+   Each specialist must atomically start its own returned task with
+   `team_preflight.py --claim`, exact role, current trajectory and
+   non-overlapping resource keys. After production completes, compile
+   `--stage qa` and give that returned work order to a fresh QA trajectory.
+   Do not pass a numeric score:
    schema-v5 computes it from fixed checklist weights and caps any critical
    failure at 5.9. Morphology visual evidence requires `view_file` on the exact
    local artifact and schema-v2 reference, matching hashes, and a separate
@@ -142,9 +154,11 @@ The coordinator must expand that shorthand internally:
 
 1. Resolve the channel slug, active format, platform, and canonical template
    from the dynamic profile.
-2. Create one unique intake draft and task identity per post.
-3. Run preflight and the single-ID orchestrator sequentially for every post.
-   Do not call `batch_gen.py` or `gen_image_post.py` directly.
+2. Create one unique intake draft per post; let the work-order compiler ensure
+   the canonical production/QA task pair.
+3. Compile and execute the production work order, then compile and execute the
+   QA work order sequentially for every post. Do not call `batch_gen.py` or
+   `gen_image_post.py` directly and do not create versioned retry tasks.
 4. Do not run photo generation in parallel and do not start runtime
    reset/archive work while the production run is active.
 5. Require independent, hash-bound QA and coordinator acceptance for every
