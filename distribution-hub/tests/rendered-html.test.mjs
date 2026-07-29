@@ -14,8 +14,15 @@ test("the root route renders the Distribution Hub application", async () => {
   assert.match(layout, /<html lang="vi">/);
   assert.match(page, /<DistributionHub \/>/);
   assert.match(client, /Công việc đăng bài/i);
+  assert.match(client, /Operations Workbench|workbench-detail/i);
+  assert.match(client, /Việc của tôi/i);
+  assert.match(client, /Chọn một bài để bắt đầu/i);
   assert.match(client, /Đang kết nối/i);
   assert.match(client, /Nhận xử lý nền tảng này/i);
+  assert.doesNotMatch(client, /className="drawer".*Chi tiết công việc/s);
+  assert.match(styles, /grid-template-columns:\s*220px/);
+  assert.match(styles, /\.workbench-detail/);
+  assert.match(styles, /\.queue-skeleton/);
   assert.match(styles, /min-height:\s*44px/);
   assert.match(styles, /prefers-reduced-motion/);
   assert.match(styles, /@media \(max-width: 920px\)/);

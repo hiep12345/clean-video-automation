@@ -6,6 +6,7 @@ import type {
   DistributionJob,
   JobAction,
   JobState,
+  QueueItem,
   QueueResponse,
 } from "@/lib/types";
 import { MappingReviewPanel } from "./mapping-review-panel";
@@ -364,6 +365,7 @@ export function DistributionHub() {
   const [query, setQuery] = useState("");
   const [channel, setChannel] = useState("ALL");
   const [status, setStatus] = useState("ALL");
+  const [workView, setWorkView] = useState<WorkView>("ACTIONABLE");
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [busyJob, setBusyJob] = useState<string | null>(null);
   const [teamOpen, setTeamOpen] = useState(false);
@@ -419,12 +421,18 @@ export function DistributionHub() {
         channel === "ALL" || item.channelCode === channel;
       const matchesStatus =
         status === "ALL" || item.bufferState === status;
-      return matchesQuery && matchesChannel && matchesStatus;
+      const matchesView =
+        workView === "ALL" ||
+        (workView === "ACTIONABLE" && item.bufferState !== "COMPLETE") ||
+        (workView === "MINE" &&
+          item.jobs.some((job) => job.assigneeEmail === data.actor)) ||
+        (workView === "BLOCKED" && item.bufferState === "BLOCKED") ||
+        (workView === "COMPLETE" && item.bufferState === "COMPLETE");
+      return matchesQuery && matchesChannel && matchesStatus && matchesView;
     });
-  }, [channel, data.items, query, status]);
+  }, [channel, data.actor, data.items, query, status, workView]);
 
-  const selected =
-    data.items.find((item) => item.id === selectedId) ?? null;
+  const selected = filtered.find((item) => item.id === selectedId) ?? null;
 
   const stats = useMemo(
     () => ({
@@ -436,8 +444,11 @@ export function DistributionHub() {
         .length,
       complete: data.items.filter((item) => item.bufferState === "COMPLETE")
         .length,
+      mine: data.items.filter((item) =>
+        item.jobs.some((job) => job.assigneeEmail === data.actor),
+      ).length,
     }),
-    [data.items],
+    [data.actor, data.items],
   );
 
   async function act(
@@ -470,34 +481,71 @@ export function DistributionHub() {
     }
   }
 
+  const viewOptions: Array<{
+    id: WorkView;
+    label: string;
+    count: number;
+    icon: "check" | "inbox" | "warning";
+  }> = [
+    {
+      id: "ACTIONABLE",
+      label: "Cần xử lý",
+      count: data.items.length - stats.complete,
+      icon: "inbox",
+    },
+    { id: "MINE", label: "Việc của tôi", count: stats.mine, icon: "check" },
+    { id: "BLOCKED", label: "Đang vướng", count: stats.blocked, icon: "warning" },
+    { id: "COMPLETE", label: "Đã hoàn tất", count: stats.complete, icon: "check" },
+    { id: "ALL", label: "Tất cả", count: data.items.length, icon: "inbox" },
+  ];
+
   return (
-    <main className="app-shell">
-      <aside className="sidebar">
-        <div className="brand">
+    <main className="ops-shell">
+      <aside className="ops-rail">
+        <div className="ops-brand">
           <span className="brand-mark">DH</span>
           <div>
             <strong>Distribution Hub</strong>
-            <span>Trung tâm đăng bài thủ công</span>
+            <span>Điều phối đăng bài</span>
           </div>
         </div>
 
-        <p className="nav-label">KÊNH NỘI DUNG</p>
-        <nav className="channel-nav" aria-label="Channels">
+        <nav className="view-nav" aria-label="Phạm vi công việc">
+          <p className="nav-label">CÔNG VIỆC</p>
+          {viewOptions.map((view) => (
+            <button
+              key={view.id}
+              className={workView === view.id ? "view-item active" : "view-item"}
+              onClick={() => {
+                setWorkView(view.id);
+                setStatus("ALL");
+              }}
+            >
+              <Icon name={view.icon} size={17} />
+              <span>{view.label}</span>
+              <b>{view.count}</b>
+            </button>
+          ))}
+        </nav>
+
+        <nav className="channel-section" aria-label="Kênh nội dung">
+          <p className="nav-label">KÊNH</p>
           <button
-            className={channel === "ALL" ? "nav-item active" : "nav-item"}
+            className={channel === "ALL" ? "channel-item active" : "channel-item"}
             onClick={() => setChannel("ALL")}
           >
-            <span className="all-channel-mark" /> Tất cả kênh
+            <span className="all-channel-mark" />
+            <span>Tất cả kênh</span>
             <b>{data.items.length}</b>
           </button>
           {channels.map((code) => (
             <button
               key={code}
-              className={channel === code ? "nav-item active" : "nav-item"}
+              className={channel === code ? "channel-item active" : "channel-item"}
               onClick={() => setChannel(code)}
             >
               <span className={`channel-bullet channel-${code.toLowerCase()}`} />
-              {code}
+              <span>{code}</span>
               <b>
                 {data.items.filter((item) => item.channelCode === code).length}
               </b>
@@ -505,7 +553,21 @@ export function DistributionHub() {
           ))}
         </nav>
 
-        <div className="sidebar-footer">
+        {data.membership.canManageTeam && (
+          <div className="admin-tools">
+            <p className="nav-label">QUẢN TRỊ</p>
+            <button onClick={() => setMappingReviewOpen(true)}>
+              <Icon name="settings" size={17} />
+              <span>Mapping Meta</span>
+            </button>
+            <button onClick={() => setTeamOpen(true)}>
+              <Icon name="users" size={17} />
+              <span>Thành viên</span>
+            </button>
+          </div>
+        )}
+
+        <div className="ops-profile">
           <span className="avatar">{initials(data.actor || "LO")}</span>
           <div>
             <strong>{data.actor ? data.actor.split("@")[0] : "Đang tải"}</strong>
@@ -515,147 +577,74 @@ export function DistributionHub() {
                 : data.membership.role === "OPERATOR"
                   ? "Người đăng bài"
                   : "Chỉ xem"}
-              {data.membership.role !== "ADMIN" &&
-              data.membership.channelCodes.length
-                ? ` · ${data.membership.channelCodes.join(", ")}`
-                : ""}
             </span>
           </div>
         </div>
       </aside>
 
-      <section className="workspace">
-        <header className="workspace-header">
+      <section className="queue-pane">
+        <header className="queue-header">
           <div>
-            <p className="eyebrow">DISTRIBUTION HUB</p>
+            <p className="eyebrow">HÔM NAY</p>
             <h1>Công việc đăng bài</h1>
-            <p className="subtitle">
-              Chọn một bài để xử lý riêng từng nền tảng. Trạng thái được hệ
-              thống tự tính từ thao tác thực tế.
-            </p>
+            <p>Chọn một bài, sau đó thực hiện hành động tiếp theo ở bên phải.</p>
           </div>
-          <div className="header-actions">
-            {data.membership.canManageTeam && (
-              <>
-                <button
-                  className="button button-secondary"
-                  onClick={() => setMappingReviewOpen(true)}
-                >
-                  Mapping Meta
-                </button>
-                <button
-                  className="button button-secondary"
-                  onClick={() => setTeamOpen(true)}
-                >
-                  Thành viên
-                </button>
-              </>
-            )}
-            <button className="button button-secondary" onClick={() => load()}>
-              Làm mới
-            </button>
+          <div className="queue-header-actions">
             <span className="live-indicator">
               <i /> Đang kết nối
             </span>
+            <button
+              className="icon-button"
+              onClick={() => load()}
+              aria-label="Làm mới danh sách"
+              title="Làm mới"
+            >
+              <Icon name="refresh" />
+            </button>
           </div>
         </header>
 
-        <div className="stat-strip" aria-label="Tổng quan trạng thái">
-          <button
-            className={status === "READY" ? "metric-card active" : "metric-card"}
-            onClick={() => setStatus(status === "READY" ? "ALL" : "READY")}
+        <div className="queue-controls">
+          <label className="ops-search">
+            <Icon name="search" size={17} />
+            <input
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
+              placeholder="Tìm tên bài hoặc mã nội dung"
+              aria-label="Tìm nội dung"
+            />
+          </label>
+          <select
+            value={status}
+            onChange={(event) => setStatus(event.target.value)}
+            aria-label="Lọc theo trạng thái"
           >
-            <span className="metric-dot metric-ready" />
-            <span>
-              <b>Sẵn sàng</b>
-              <small>Có thể nhận xử lý ngay</small>
-            </span>
-            <strong>{stats.ready}</strong>
-          </button>
-          <button
-            className={
-              status === "IN_PROGRESS" ? "metric-card active" : "metric-card"
-            }
-            onClick={() =>
-              setStatus(status === "IN_PROGRESS" ? "ALL" : "IN_PROGRESS")
-            }
-          >
-            <span className="metric-dot metric-progress" />
-            <span>
-              <b>Đang làm</b>
-              <small>Đã có người nhận việc</small>
-            </span>
-            <strong>{stats.active}</strong>
-          </button>
-          <button
-            className={
-              status === "BLOCKED" ? "metric-card active" : "metric-card"
-            }
-            onClick={() => setStatus(status === "BLOCKED" ? "ALL" : "BLOCKED")}
-          >
-            <span className="metric-dot metric-blocked" />
-            <span>
-              <b>Đang vướng</b>
-              <small>Cần kiểm tra hoặc bổ sung</small>
-            </span>
-            <strong>{stats.blocked}</strong>
-          </button>
-          <button
-            className={
-              status === "COMPLETE" ? "metric-card active" : "metric-card"
-            }
-            onClick={() =>
-              setStatus(status === "COMPLETE" ? "ALL" : "COMPLETE")
-            }
-          >
-            <span className="metric-dot metric-complete" />
-            <span>
-              <b>Hoàn tất</b>
-              <small>Đã đủ các nền tảng</small>
-            </span>
-            <strong>{stats.complete}</strong>
-          </button>
+            <option value="ALL">Mọi trạng thái</option>
+            <option value="READY">Sẵn sàng</option>
+            <option value="IN_PROGRESS">Đang làm</option>
+            <option value="BLOCKED">Đang vướng</option>
+            <option value="COMPLETE">Hoàn tất</option>
+          </select>
+          {(query || status !== "ALL" || channel !== "ALL") && (
+            <button
+              className="button button-ghost"
+              onClick={() => {
+                setQuery("");
+                setStatus("ALL");
+                setChannel("ALL");
+              }}
+            >
+              Xóa lọc
+            </button>
+          )}
         </div>
 
-        <div className="database-toolbar">
-          <div className="result-heading">
-            <strong>Danh sách nội dung</strong>
-            <span>{filtered.length} bài phù hợp</span>
-          </div>
-          <div className="filters">
-            <label className="search-box">
-              <span aria-hidden="true">⌕</span>
-              <input
-                value={query}
-                onChange={(event) => setQuery(event.target.value)}
-                placeholder="Tìm tên bài hoặc mã nội dung"
-                aria-label="Tìm nội dung"
-              />
-            </label>
-            <select
-              value={status}
-              onChange={(event) => setStatus(event.target.value)}
-              aria-label="Lọc theo trạng thái"
-            >
-              <option value="ALL">Tất cả trạng thái</option>
-              <option value="READY">Sẵn sàng</option>
-              <option value="IN_PROGRESS">Đang làm</option>
-              <option value="BLOCKED">Đang vướng</option>
-              <option value="COMPLETE">Hoàn tất</option>
-            </select>
-            {(query || status !== "ALL" || channel !== "ALL") && (
-              <button
-                className="button button-ghost clear-filter"
-                onClick={() => {
-                  setQuery("");
-                  setStatus("ALL");
-                  setChannel("ALL");
-                }}
-              >
-                Xóa lọc
-              </button>
-            )}
-          </div>
+        <div className="queue-summary">
+          <strong>{filtered.length} bài</strong>
+          <span>
+            {stats.ready} sẵn sàng · {stats.active} đang làm · {stats.blocked}{" "}
+            đang vướng
+          </span>
         </div>
 
         {error && (
@@ -664,133 +653,76 @@ export function DistributionHub() {
           </div>
         )}
 
-        <div className="table-card">
-          <div className="table-head row-grid">
-            <span>Nội dung</span>
-            <span>Kênh</span>
-            <span>Nền tảng</span>
-            <span>Trạng thái</span>
-            <span>Ngày tạo</span>
-            <span>QA</span>
-            <span />
-          </div>
+        <div className="work-list" aria-live="polite">
           {loading ? (
-            <div className="empty-state">
-              <span className="loading-ring" />
-              <span>Đang tải danh sách công việc…</span>
+            <div className="queue-skeleton" aria-label="Đang tải danh sách">
+              {[0, 1, 2, 3, 4].map((item) => (
+                <span key={item} />
+              ))}
             </div>
           ) : filtered.length === 0 ? (
             <div className="empty-state">
-              <strong>Không tìm thấy nội dung</strong>
-              <span>Hãy thử đổi kênh, trạng thái hoặc từ khóa tìm kiếm.</span>
+              <strong>Không có công việc phù hợp</strong>
+              <span>Thử đổi phạm vi, kênh hoặc từ khóa tìm kiếm.</span>
             </div>
           ) : (
-            filtered.map((item) => (
-              <button
-                className="table-row row-grid"
-                key={item.id}
-                onClick={() => setSelectedId(item.id)}
-              >
-                <span className="content-cell">
-                  <span className="content-icon" aria-hidden="true">
+            filtered.map((item) => {
+              const active = selectedId === item.id;
+              return (
+                <button
+                  className={active ? "work-item active" : "work-item"}
+                  key={item.id}
+                  onClick={() => setSelectedId(item.id)}
+                  aria-pressed={active}
+                >
+                  <span className="work-type" aria-hidden="true">
                     {item.contentType.toLowerCase() === "photo" ? "ẢNH" : "VIDEO"}
                   </span>
-                  <span>
-                    <strong title={item.title}>{item.title}</strong>
-                    <small>{item.id}</small>
+                  <span className="work-content">
+                    <span className="work-title-line">
+                      <strong title={item.title}>{item.title}</strong>
+                      <span
+                        className={`channel-tag channel-${item.channelCode.toLowerCase()}`}
+                      >
+                        {item.channelCode}
+                      </span>
+                    </span>
+                    <span className="work-progress">
+                      {item.jobs.map((job) => (
+                        <PlatformMark key={job.id} job={job} />
+                      ))}
+                    </span>
+                    <span className="work-next">
+                      <span className="next-label">{nextAction(item, data.actor)}</span>
+                      <span>{formatDate(item.producedAt)}</span>
+                    </span>
                   </span>
-                </span>
-                <span>
-                  <span className={`channel-tag channel-${item.channelCode.toLowerCase()}`}>
-                    {item.channelCode}
-                  </span>
-                </span>
-                <span className="platforms-cell">
-                  {item.jobs.map((job) => (
-                    <PlatformMark key={job.id} job={job} />
-                  ))}
-                </span>
-                <span><StatusPill state={item.bufferState} /></span>
-                <span className="muted">{formatDate(item.producedAt)}</span>
-                <span className="qa-score">
-                  {item.qaScore?.toFixed(1) ?? "—"}
-                </span>
-                <span className="row-arrow">›</span>
-              </button>
-            ))
+                  <Icon name="chevron" size={17} />
+                </button>
+              );
+            })
           )}
-          <div className="table-footer">
-            <strong>{filtered.length} bài</strong>
-            <span>
-              {filtered.reduce((count, item) => count + item.jobs.length, 0)}{" "}
-              công việc nền tảng độc lập
-            </span>
-          </div>
         </div>
       </section>
 
-      {selected && (
-        <div className="drawer-backdrop" onMouseDown={() => setSelectedId(null)}>
-          <aside
-            className="drawer"
-            onMouseDown={(event) => event.stopPropagation()}
-            aria-label="Chi tiết công việc đăng bài"
-            aria-modal="true"
-            role="dialog"
-          >
-            <div className="drawer-head">
-              <div>
-                <span className={`channel-tag channel-${selected.channelCode.toLowerCase()}`}>
-                  {selected.channelCode}
-                </span>
-                <h2>{selected.title}</h2>
-                <p>{selected.id}</p>
-              </div>
-              <button
-                className="close-button"
-                onClick={() => setSelectedId(null)}
-                aria-label="Đóng chi tiết"
-              >
-                ×
-              </button>
-            </div>
-
-            <div className="content-summary">
-              <div><span>Trạng thái tổng</span><StatusPill state={selected.bufferState} /></div>
-              <div><span>Điểm QA</span><strong>{selected.qaScore?.toFixed(1) ?? "—"}</strong></div>
-              <div><span>Ngày tạo</span><strong>{formatDate(selected.producedAt)}</strong></div>
-              {selected.driveUrl && (
-                <a href={selected.driveUrl} target="_blank" rel="noreferrer">
-                  Mở file Google Drive ↗
-                </a>
-              )}
-            </div>
-
-            <div className="drawer-section-title">
-              <h3>Xử lý theo nền tảng</h3>
-              <span>{selected.jobs.length} nền tảng</span>
-            </div>
-            {selected.jobs.map((job) => (
-              <JobPanel
-                key={job.id}
-                job={job}
-                actor={data.actor}
-                busy={busyJob === job.id}
-                onAction={act}
-              />
-            ))}
-
-            <div className="audit-note">
-              <strong>Lịch sử thao tác được lưu tự động.</strong>
-              <p>
-                Hệ thống ghi nhận người thực hiện, thời gian, phiên bản và link
-                bài đăng. Trạng thái tổng hợp được tính tự động nên không bị
-                ghi đè bởi lần đồng bộ khác.
-              </p>
-            </div>
-          </aside>
-        </div>
+      {selected ? (
+        <ContentInspector
+          item={selected}
+          actor={data.actor}
+          busyJob={busyJob}
+          onAction={act}
+          onClose={() => setSelectedId(null)}
+        />
+      ) : (
+        <aside className="workbench-detail detail-empty">
+          <span className="detail-empty-icon">
+            <Icon name="inbox" size={24} />
+          </span>
+          <strong>Chọn một bài để bắt đầu</strong>
+          <p>Chi tiết nền tảng và hành động tiếp theo sẽ xuất hiện tại đây.</p>
+        </aside>
       )}
+
       {teamOpen && <TeamPanel onClose={() => setTeamOpen(false)} />}
       {mappingReviewOpen && (
         <MappingReviewPanel
@@ -799,5 +731,205 @@ export function DistributionHub() {
         />
       )}
     </main>
+  );
+}
+
+type WorkView = "ACTIONABLE" | "MINE" | "BLOCKED" | "COMPLETE" | "ALL";
+
+function Icon({
+  name,
+  size = 18,
+}: {
+  name:
+    | "check"
+    | "chevron"
+    | "inbox"
+    | "refresh"
+    | "search"
+    | "settings"
+    | "users"
+    | "warning"
+    | "x";
+  size?: number;
+}) {
+  const paths = {
+    check: <path d="m5 12 4 4L19 6" />,
+    chevron: <path d="m9 18 6-6-6-6" />,
+    inbox: (
+      <>
+        <path d="M4 4h16v13H4z" />
+        <path d="M4 13h4l2 3h4l2-3h4" />
+      </>
+    ),
+    refresh: (
+      <>
+        <path d="M20 11a8.1 8.1 0 0 0-15.5-2M4 4v5h5" />
+        <path d="M4 13a8.1 8.1 0 0 0 15.5 2M20 20v-5h-5" />
+      </>
+    ),
+    search: (
+      <>
+        <circle cx="11" cy="11" r="7" />
+        <path d="m20 20-4-4" />
+      </>
+    ),
+    settings: (
+      <>
+        <circle cx="12" cy="12" r="3" />
+        <path d="M19.4 15a1.7 1.7 0 0 0 .3 1.9l.1.1-2.8 2.8-.1-.1a1.7 1.7 0 0 0-1.9-.3 1.7 1.7 0 0 0-1 1.6v.2h-4V21a1.7 1.7 0 0 0-1-1.6 1.7 1.7 0 0 0-1.9.3l-.1.1L4.2 17l.1-.1a1.7 1.7 0 0 0 .3-1.9A1.7 1.7 0 0 0 3 14H2.8v-4H3a1.7 1.7 0 0 0 1.6-1 1.7 1.7 0 0 0-.3-1.9L4.2 7 7 4.2l.1.1A1.7 1.7 0 0 0 9 4.6 1.7 1.7 0 0 0 10 3v-.2h4V3a1.7 1.7 0 0 0 1 1.6 1.7 1.7 0 0 0 1.9-.3l.1-.1L19.8 7l-.1.1a1.7 1.7 0 0 0-.3 1.9 1.7 1.7 0 0 0 1.6 1h.2v4H21a1.7 1.7 0 0 0-1.6 1Z" />
+      </>
+    ),
+    users: (
+      <>
+        <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
+        <circle cx="9" cy="7" r="4" />
+        <path d="M22 21v-2a4 4 0 0 0-3-3.9M16 3.1a4 4 0 0 1 0 7.8" />
+      </>
+    ),
+    warning: (
+      <>
+        <path d="M10.3 2.9 1.8 17a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 2.9a2 2 0 0 0-3.4 0Z" />
+        <path d="M12 9v4M12 17h.01" />
+      </>
+    ),
+    x: <path d="M18 6 6 18M6 6l12 12" />,
+  };
+
+  return (
+    <svg
+      aria-hidden="true"
+      className="ui-icon"
+      fill="none"
+      height={size}
+      viewBox="0 0 24 24"
+      width={size}
+    >
+      <g
+        stroke="currentColor"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth="2"
+      >
+        {paths[name]}
+      </g>
+    </svg>
+  );
+}
+
+function nextAction(item: QueueItem, actor: string) {
+  if (item.bufferState === "COMPLETE") return "Đã hoàn tất";
+  if (item.bufferState === "BLOCKED") return "Kiểm tra vướng mắc";
+  if (
+    item.jobs.some(
+      (job) =>
+        job.assigneeEmail === actor &&
+        ["CLAIMED", "SCHEDULED"].includes(job.state),
+    )
+  ) {
+    return "Tiếp tục xử lý";
+  }
+  if (item.jobs.some((job) => job.state === "READY")) return "Nhận xử lý";
+  return "Xem tiến độ";
+}
+
+function ContentInspector({
+  item,
+  actor,
+  busyJob,
+  onAction,
+  onClose,
+}: {
+  item: QueueItem;
+  actor: string;
+  busyJob: string | null;
+  onAction: JobPanelProps["onAction"];
+  onClose: () => void;
+}) {
+  return (
+    <aside className="workbench-detail" aria-label="Chi tiết công việc đăng bài">
+      <header className="inspector-head">
+        <div className="inspector-heading">
+          <div className="inspector-meta">
+            <span
+              className={`channel-tag channel-${item.channelCode.toLowerCase()}`}
+            >
+              {item.channelCode}
+            </span>
+            <StatusPill state={item.bufferState} />
+          </div>
+          <h2>{item.title}</h2>
+          <p>{nextAction(item, actor)}</p>
+        </div>
+        <button
+          className="icon-button inspector-close"
+          onClick={onClose}
+          aria-label="Đóng chi tiết"
+        >
+          <Icon name="x" />
+        </button>
+      </header>
+
+      <div className="inspector-scroll">
+        <section className="content-facts" aria-label="Thông tin nội dung">
+          <div>
+            <span>Định dạng</span>
+            <strong>
+              {item.contentType.toLowerCase() === "photo" ? "Ảnh" : "Video"}
+            </strong>
+          </div>
+          <div>
+            <span>Ngày tạo</span>
+            <strong>{formatDate(item.producedAt)}</strong>
+          </div>
+          <div>
+            <span>Điểm QA</span>
+            <strong>{item.qaScore?.toFixed(1) ?? "—"}</strong>
+          </div>
+        </section>
+
+        {item.driveUrl && (
+          <a
+            className="drive-link"
+            href={item.driveUrl}
+            target="_blank"
+            rel="noreferrer"
+          >
+            Mở file nguồn trên Google Drive
+            <span aria-hidden="true">↗</span>
+          </a>
+        )}
+
+        <div className="inspector-section-title">
+          <div>
+            <h3>Nền tảng đăng bài</h3>
+            <p>Chỉ xử lý hành động đang được hiển thị cho từng nền tảng.</p>
+          </div>
+          <span>{item.jobs.length}</span>
+        </div>
+
+        {item.jobs.map((job) => (
+          <JobPanel
+            key={job.id}
+            job={job}
+            actor={actor}
+            busy={busyJob === job.id}
+            onAction={onAction}
+          />
+        ))}
+
+        <div className="audit-note">
+          <strong>Hệ thống tự lưu lịch sử thao tác</strong>
+          <p>
+            Người thực hiện, thời gian, phiên bản và link bài đăng đều được ghi
+            nhận. Trạng thái tổng được tính từ dữ liệu thực tế.
+          </p>
+        </div>
+
+        <details className="technical-details">
+          <summary>Thông tin kỹ thuật</summary>
+          <code>{item.id}</code>
+        </details>
+      </div>
+    </aside>
   );
 }
