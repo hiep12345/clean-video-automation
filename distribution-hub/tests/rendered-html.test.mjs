@@ -18,6 +18,10 @@ test("the root route renders the Distribution Hub application", async () => {
   assert.match(client, /Việc của tôi/i);
   assert.match(client, /Chọn một bài để bắt đầu/i);
   assert.match(client, /Đang kết nối/i);
+  assert.match(client, /Đã đồng bộ/i);
+  assert.match(client, /Thử lại/i);
+  assert.match(client, /Bộ lọc và quản trị nhanh/i);
+  assert.match(client, /Lọc theo kênh/i);
   assert.match(client, /Nhận xử lý nền tảng này/i);
   assert.doesNotMatch(client, /className="drawer".*Chi tiết công việc/s);
   assert.match(styles, /grid-template-columns:\s*220px/);
@@ -66,6 +70,9 @@ test("team access is dynamic and enforced by channel on the server", async () =>
   assert.match(control, /not assigned to channel/);
   assert.match(control, /Viewer accounts cannot change upload state/);
   assert.match(client, /Phân quyền được lưu trong hệ thống/);
+  assert.match(client, /Chọn ít nhất một kênh/i);
+  assert.match(client, /Email chưa đúng định dạng/i);
+  assert.match(client, /Đã lưu quyền cho/i);
   assert.doesNotMatch(teamStore, /bk\.operator|mt\.operator|su\.operator/i);
 });
 

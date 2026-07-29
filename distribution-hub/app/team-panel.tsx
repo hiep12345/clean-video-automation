@@ -51,6 +51,7 @@ export function TeamPanel({ onClose }: { onClose: () => void }) {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+  const [success, setSuccess] = useState("");
 
   const load = useCallback(async () => {
     try {
@@ -92,6 +93,8 @@ export function TeamPanel({ onClose }: { onClose: () => void }) {
 
   async function save() {
     setSaving(true);
+    setError("");
+    setSuccess("");
     try {
       const response = await fetch("/api/team", {
         method: "POST",
@@ -113,7 +116,10 @@ export function TeamPanel({ onClose }: { onClose: () => void }) {
       };
       if (!response.ok) throw new Error(payload.error || "Unable to save member");
       await load();
-      if (payload.member) setDraft(draftFromMember(payload.member));
+      if (payload.member) {
+        setDraft(draftFromMember(payload.member));
+        setSuccess(`Đã lưu quyền cho ${payload.member.displayName}.`);
+      }
     } catch (saveError) {
       setError(saveError instanceof Error ? saveError.message : "Save failed");
     } finally {
@@ -122,23 +128,35 @@ export function TeamPanel({ onClose }: { onClose: () => void }) {
   }
 
   const needsChannels = draft.role !== "ADMIN" && draft.active;
+  const emailIsValid = /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(
+    draft.email.trim().toLowerCase(),
+  );
   const canSave =
-    draft.email.trim().length > 3 &&
+    emailIsValid &&
     (!needsChannels || draft.channelCodes.length > 0);
+  const saveHint = !draft.email.trim()
+    ? "Nhập email để tạo hoặc cập nhật thành viên."
+    : !emailIsValid
+      ? "Email chưa đúng định dạng, ví dụ member@company.com."
+      : needsChannels && draft.channelCodes.length === 0
+        ? "Chọn ít nhất một kênh cho vai trò này."
+        : draft.version
+          ? "Các thay đổi sẽ có hiệu lực ở lần tải dữ liệu tiếp theo."
+          : "Thành viên mới sẽ đăng nhập bằng đúng email này.";
 
   return (
     <div className="drawer-backdrop" onMouseDown={onClose}>
       <aside
         className="drawer team-drawer"
         onMouseDown={(event) => event.stopPropagation()}
-        aria-label="Quản lý thành viên và phân quyền kênh"
+        aria-labelledby="team-panel-title"
         aria-modal="true"
         role="dialog"
       >
         <div className="drawer-head">
           <div>
             <span className="section-kicker">QUẢN LÝ QUYỀN TRUY CẬP</span>
-            <h2>Thành viên và kênh phụ trách</h2>
+            <h2 id="team-panel-title">Thành viên và kênh phụ trách</h2>
             <p>Mỗi người chỉ nhìn thấy và xử lý các kênh được phân công.</p>
           </div>
           <button className="close-button" onClick={onClose} aria-label="Đóng quản lý thành viên">
@@ -151,20 +169,34 @@ export function TeamPanel({ onClose }: { onClose: () => void }) {
             {error}
           </div>
         )}
+        {success && (
+          <div className="success-banner" role="status" aria-live="polite">
+            {success}
+          </div>
+        )}
 
         <div className="team-layout">
           <section className="member-list">
             <div className="member-list-head">
-            <strong>Danh sách thành viên</strong>
+              <strong>Danh sách thành viên</strong>
+              {!loading && <span>{data.members.length} người</span>}
               <button
                 className="button button-secondary"
-                onClick={() => setDraft(blankDraft)}
+                onClick={() => {
+                  setDraft(blankDraft);
+                  setError("");
+                  setSuccess("");
+                }}
               >
                 + Thêm thành viên
               </button>
             </div>
             {loading ? (
               <p className="team-empty">Đang tải thành viên…</p>
+            ) : data.members.length === 0 ? (
+              <p className="team-empty">
+                Chưa có thành viên. Chọn “Thêm thành viên” để bắt đầu.
+              </p>
             ) : (
               data.members.map((member) => (
                 <button
@@ -214,17 +246,21 @@ export function TeamPanel({ onClose }: { onClose: () => void }) {
                   autoComplete="email"
                   value={draft.email}
                   disabled={draft.version > 0}
-                  onChange={(event) =>
+                  aria-invalid={Boolean(draft.email.trim()) && !emailIsValid}
+                  aria-describedby="team-save-hint"
+                  onChange={(event) => {
                     setDraft((current) => ({
                       ...current,
                       email: event.target.value,
-                    }))
-                  }
+                    }));
+                    setError("");
+                    setSuccess("");
+                  }}
                   placeholder="member@company.com"
                 />
               </label>
               <label>
-                Tên hiển thị
+                Tên hiển thị <small>(không bắt buộc)</small>
                 <input
                   value={draft.displayName}
                   onChange={(event) =>
@@ -233,7 +269,7 @@ export function TeamPanel({ onClose }: { onClose: () => void }) {
                       displayName: event.target.value,
                     }))
                   }
-                  placeholder="Tên thành viên"
+                  placeholder="Mặc định lấy từ email"
                 />
               </label>
               <label>
@@ -294,9 +330,18 @@ export function TeamPanel({ onClose }: { onClose: () => void }) {
               className="button button-primary save-member"
               disabled={!canSave || saving}
               onClick={() => void save()}
+              aria-describedby="team-save-hint"
             >
               {saving ? "Đang lưu…" : "Lưu phân quyền"}
             </button>
+            <p
+              id="team-save-hint"
+              className={canSave ? "save-hint is-ready" : "save-hint"}
+              role="status"
+              aria-live="polite"
+            >
+              {saveHint}
+            </p>
           </section>
         </div>
 

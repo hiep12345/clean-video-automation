@@ -361,6 +361,8 @@ export function DistributionHub() {
     items: [],
   });
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [lastSyncedAt, setLastSyncedAt] = useState<Date | null>(null);
   const [error, setError] = useState("");
   const [query, setQuery] = useState("");
   const [channel, setChannel] = useState("ALL");
@@ -372,6 +374,7 @@ export function DistributionHub() {
   const [mappingReviewOpen, setMappingReviewOpen] = useState(false);
 
   const load = useCallback(async () => {
+    setRefreshing(true);
     try {
       const response = await fetch("/api/queue", { cache: "no-store" });
       const payload = (await response.json()) as QueueResponse & {
@@ -380,10 +383,12 @@ export function DistributionHub() {
       if (!response.ok) throw new Error(payload.error || "Unable to load queue");
       setData(payload);
       setError("");
+      setLastSyncedAt(new Date());
     } catch (loadError) {
       setError(loadError instanceof Error ? loadError.message : "Load failed");
     } finally {
       setLoading(false);
+      setRefreshing(false);
     }
   }, []);
 
@@ -590,12 +595,26 @@ export function DistributionHub() {
             <p>Chọn một bài, sau đó thực hiện hành động tiếp theo ở bên phải.</p>
           </div>
           <div className="queue-header-actions">
-            <span className="live-indicator">
-              <i /> Đang kết nối
+            <span
+              className={`live-indicator${error ? " is-error" : refreshing ? " is-syncing" : ""}`}
+              role="status"
+            >
+              <i />
+              {error
+                ? "Cần kết nối lại"
+                : refreshing
+                  ? "Đang đồng bộ"
+                  : lastSyncedAt
+                    ? `Đã đồng bộ ${lastSyncedAt.toLocaleTimeString("vi-VN", {
+                        hour: "2-digit",
+                        minute: "2-digit",
+                      })}`
+                    : "Đang kết nối"}
             </span>
             <button
-              className="icon-button"
+              className={`icon-button${refreshing ? " is-refreshing" : ""}`}
               onClick={() => load()}
+              disabled={refreshing}
               aria-label="Làm mới danh sách"
               title="Làm mới"
             >
@@ -639,6 +658,43 @@ export function DistributionHub() {
           )}
         </div>
 
+        <div className="mobile-tools" aria-label="Bộ lọc và quản trị nhanh">
+          <label>
+            <span>Kênh</span>
+            <select
+              value={channel}
+              onChange={(event) => setChannel(event.target.value)}
+              aria-label="Lọc theo kênh"
+            >
+              <option value="ALL">Tất cả kênh</option>
+              {channels.map((code) => (
+                <option key={code} value={code}>
+                  {code} ·{" "}
+                  {data.items.filter((item) => item.channelCode === code).length} bài
+                </option>
+              ))}
+            </select>
+          </label>
+          {data.membership.canManageTeam && (
+            <div className="mobile-admin-actions">
+              <button
+                className="button button-secondary"
+                onClick={() => setMappingReviewOpen(true)}
+              >
+                <Icon name="settings" size={16} />
+                Mapping
+              </button>
+              <button
+                className="button button-secondary"
+                onClick={() => setTeamOpen(true)}
+              >
+                <Icon name="users" size={16} />
+                Thành viên
+              </button>
+            </div>
+          )}
+        </div>
+
         <div className="queue-summary">
           <strong>{filtered.length} bài</strong>
           <span>
@@ -649,7 +705,14 @@ export function DistributionHub() {
 
         {error && (
           <div className="error-banner" role="alert">
-            {error}
+            <span>{error}</span>
+            <button
+              className="button button-secondary"
+              disabled={refreshing}
+              onClick={() => load()}
+            >
+              {refreshing ? "Đang thử lại…" : "Thử lại"}
+            </button>
           </div>
         )}
 
