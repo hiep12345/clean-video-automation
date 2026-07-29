@@ -1,73 +1,141 @@
 ---
 name: Video QA Gate
-description: "Operational instructions and strict checklists for L2 (clip) and L3 (final) video QA loaded dynamically from channel config files."
+description: "Operational instructions for independent, config-driven keyframe, L2, thumbnail, and L3 video QA with hash-bound receipts."
 ---
 
 <!-- skip-skill-gate -->
-# Video QA Gate — Operational Instructions & Checklists (L2/L3 QA)
+# Video QA Gate
 
-Tài liệu này là **Single Source of Truth (SSOT)** về quy định kiểm duyệt chất lượng trực quan L2 (clip thô) và L3 (video final). Áp dụng bắt buộc cho cả Đặc vụ AI và các thành viên trong nhóm (team members) để đảm bảo tính ổn định và không bỏ sót lỗi.
+Đây là hướng dẫn vận hành bắt buộc cho người hoặc agent thực hiện QA video.
+Rule, threshold và khác biệt giữa các format phải được đọc từ cấu hình; không
+được thêm điều kiện theo channel slug, video ID hoặc một Reel cụ thể.
 
----
+## Nguồn hợp đồng
 
-## 🛠️ Quy Trình Thực Thi QA
+Trước khi review, bắt buộc đọc:
 
-### 1. Phân Phối Trách Nhiệm (Role Boundary)
-*   **AI Đặc vụ QA (`qa-reviewer`)**: Nhận lệnh từ CEO để tự động xem video qua công cụ native `view_file` (Gemini vision), đối chiếu theo checklist của kênh tương ứng và ghi kết quả ra tệp `review_results.json` và `l3_qa.review`.
-*   **CEO Agent (Parent Agent)**: Đọc báo cáo của Đặc vụ QA, tự mình gọi `view_file` xem lại video để kiểm định chéo và phê duyệt/bác bỏ kết quả cuối cùng.
-*   **Thành viên dự án (Team members)**: Đọc file `SKILL.md` và `l3_qa.review` của từng dự án để kiểm tra thủ công trước khi xuất bản.
+1. `content-planner-kb/config/channels/<channel_slug>.json`.
+2. Frontmatter của `script.md`, đặc biệt là `format_id` và
+   `qa_policy_version`.
+3. Rule catalog được chỉ định bởi `qa_policy.rule_catalog`.
 
----
+Khi `qa_policy` tồn tại, dùng
+`scripts.qa.video_policy.build_review_contract(channel_config, gate, format_id)`
+để lấy đúng threshold, weights, rule IDs và format contract. Không tự ghép
+checklist bằng trí nhớ.
 
-## 📋 Tiêu Chí Kiểm Duyệt Chung (Mọi Kênh)
+Khi kênh chưa có `qa_policy`, dùng `l2_criteria`, `detailed_qa_rules`,
+`l3_threshold` và quy trình legacy hiện hành. Không suy diễn rule của một kênh
+sang kênh khác.
 
-1.  **Chuyển động & Dị dạng hình thể (No Morphing & Glitches)**:
-    *   Cấm tuyệt đối hiện tượng các nét vẽ/đồ vật tự động biến dạng kỳ dị qua các giây (morphing).
-    *   Cấm hiện tượng tay người bị nhòe, mọc thêm ngón hoặc công cụ bị biến hình khi chuyển cảnh.
-2.  **Độ mờ chuyển động chân/cánh (Anatomy & Motion Blur Gate)**:
-    *   Cực kỳ chú ý các bộ phận chuyển động nhanh (chân côn trùng, cánh hoa bay, phới đánh trứng).
-    *   **CẤM** các chuyển động bị nhòe thành hình tròn mờ, hình cánh quạt/cánh hoa mờ (motion blur hallucination) hoặc bị hút/drifting biến mất. Nếu xảy ra, phải cho **FAIL (Score ≤ 5.9)**.
-3.  **Cân bằng âm thanh (Audio Balance)**:
-    *   Nhạc nền (BGM) lofi/cozy đặt âm lượng nhỏ (~0.10) để làm nền, không được át tiếng SFX hoặc giọng đọc.
-    *   Tiếng động thực tế (SFX) như tiếng máy trộn, tiếng gạt dao, tiếng giọt chảy phải rõ nét, đanh và chân thực.
-4.  **Căn chỉnh phụ đề (Subtitle Placement)**:
-    *   Chữ phụ đề (Text Overlay) phải nằm chính giữa, cân đối ở phần dưới màn hình (định dạng 9:16). Chữ phải rõ ràng, có viền tương phản (contrast stroke) để dễ đọc và không có lỗi chính tả.
+## Phân tách trách nhiệm
 
----
+- Producer tạo artifact nhưng không được tự review artifact đó.
+- QA reviewer phải xem trực tiếp toàn bộ artifact và ghi nhận từng rule.
+- Parent approver phải là session khác reviewer, tự xem lại artifact và kiểm
+  tra receipt trước khi phê duyệt.
+- `reviewer_session_id`, `parent_approval_session_id` và producer session, nếu
+  runtime cung cấp, phải khác nhau.
+- Cờ auto-approve hoặc yêu cầu bỏ qua QA không có giá trị với kênh đã bật
+  `qa_policy`.
 
-## 🔍 Tra Cứu Chỉ Dẫn Kiểm Duyệt Động Theo Kênh (Dynamic Channel Config)
+## Thứ tự review
 
-Để tránh hardcode và đảm bảo tính đồng bộ (Systems Thinking), các tiêu chí kiểm duyệt chi tiết và Persona của từng kênh được lưu giữ tập trung tại các file cấu hình kênh của dự án. 
+1. Xác nhận artifact tồn tại, không rỗng và là bản cần review.
+2. Tải review contract động cho đúng gate và `format_id`.
+3. Xem artifact đầy đủ. Với video, xem cả chuyển động, frame cuối và audio;
+   không chỉ xem thumbnail hoặc vài frame đại diện.
+4. Đánh giá toàn bộ rule trong contract. Một hard fail không được bù bằng điểm
+   trung bình.
+5. Tạo JSON receipt ở trạng thái thực tế. Chỉ dùng `verdict: "PASS"` khi mọi
+   rule bắt buộc là `PASS`, không có hard fail và điểm đạt threshold.
+6. Parent approver xem lại artifact và receipt, sau đó mới điền
+   `parent_approval_session_id`.
+7. Gọi `validate_receipt(...)` với đúng artifact. Chỉ sau khi validation thành
+   công mới ghi marker `PASS`.
 
-Đặc vụ QA và người thẩm định **bắt buộc** phải đọc file JSON cấu hình của kênh tương ứng trước khi tiến hành QA:
-*   **Đường dẫn file cấu hình**: `config/channels/<channel_slug>.json`
-*   **Các trường dữ liệu cần đọc**:
-    1.  `evaluation_persona` & `persona_focus`: Dùng làm danh tính và góc nhìn tâm lý khi đánh giá video.
-    2.  `l2_criteria`: Các tiêu chí đánh giá cho từng phân cảnh thô (L2 QA).
-    3.  `detailed_qa_rules`: Danh sách các quy tắc bắt buộc của kênh để chấm điểm đạt/hỏng (L3 QA).
+Marker `.review` chỉ là tín hiệu phối hợp; JSON receipt gắn SHA-256 mới là bằng
+chứng có thẩm quyền.
 
----
+## Tên file
 
-## 📂 Output Schema cho Đặc vụ QA
+| Gate | Artifact | JSON receipt | Marker |
+|---|---|---|---|
+| keyframe | `scene_*_keyframe.jpg` | cùng stem, đuôi `.qa.json` | cùng stem, đuôi `.review` |
+| L2 | `scene_*.mp4` | cùng stem, đuôi `.qa.json` | cùng stem, đuôi `.review` |
+| thumbnail | `thumbnail.jpg` | `thumbnail_qa.json` | `thumbnail.review` |
+| L3 | `final.mp4` | `review_results.json` | `l3_qa.review` |
 
-Đặc vụ QA bắt buộc phải ghi kết quả kiểm định ra tệp `review_results.json` trong thư mục video theo cấu trúc JSON mẫu sau:
+Receipt được phép theo artifact qua thao tác copy/rename nếu SHA-256 và
+`size_bytes` vẫn khớp. Bất kỳ thay đổi nội dung nào của artifact đều làm receipt
+cũ mất hiệu lực.
+
+## Receipt schema v2
+
+Mọi trường dưới đây là bắt buộc với kênh đã bật `qa_policy`:
 
 ```json
 {
-  "video_id": "mt-v057-indian-yellow",
-  "channel": "mix-therapy",
-  "reviewer_session_id": "1529c14c-6c40-43e4-8eb1-11400c3e6bab",
-  "qa_score": 9.7,
+  "schema_version": 2,
+  "policy_version": "<qa_policy.policy_version>",
+  "video_id": "<video directory name>",
+  "channel": "<channel slug>",
+  "format_id": "<script format_id>",
+  "gate": "<keyframe|l2|thumbnail|l3>",
+  "artifact": {
+    "path": "<path or filename reviewed>",
+    "sha256": "<uppercase SHA-256>",
+    "size_bytes": 123456
+  },
+  "reviewer_session_id": "<reviewer session>",
+  "parent_approval_session_id": "<different parent session>",
+  "qa_score": 8.5,
   "verdict": "PASS",
+  "hard_fail_codes": [],
   "checklist_results": {
-    "beater_shaft_solid": "PASS",
-    "paint_texture_heavy": "PASS",
-    "sound_mixer_sync": "PASS"
+    "<every rule ID from review contract>": "PASS"
   },
   "observations": {
-    "visual_payoff": "Transitions are smooth, metal parts are highly detailed and stable.",
-    "audio_sync": "Lofi BGM volume is balanced at 0.10. Mixer hum matches visual spinning perfectly.",
-    "subtitles": "Centered properly, easy to read, zero typos."
-  }
+    "summary": "<specific evidence observed in this artifact>"
+  },
+  "reviewed_at": "2026-07-29T16:00:00+00:00"
 }
 ```
+
+Quy tắc schema:
+
+- `reviewed_at` phải có timezone và không được sớm hơn modification time của
+  artifact.
+- `artifact.sha256` và `artifact.size_bytes` phải được tính từ đúng artifact
+  sau cùng.
+- `checklist_results` phải chứa mọi rule ID mà review contract yêu cầu.
+- `observations` phải là object và mô tả bằng chứng cụ thể, không dùng nhận xét
+  chung chung để thay checklist.
+- `hard_fail_codes` chỉ chứa rule ID có trong catalog.
+- Receipt có hard fail, rule khác `PASS`, điểm dưới threshold hoặc identity sai
+  phải bị từ chối fail-closed.
+
+## Hard-fail discipline
+
+Nếu rule catalog đánh dấu một lỗi là `hard_fail`, reviewer phải:
+
+1. Ghi rule ID vào `hard_fail_codes`.
+2. Chấm điểm không vượt `score_cap` của rule.
+3. Đặt `verdict: "FAIL"`.
+4. Không tạo marker `PASS`.
+
+Các lỗi thường thuộc nhóm hard fail gồm morphing/geometry drift, bộ phận chuyển
+động nhanh biến thành vòng tròn hoặc cánh quạt mờ, bộ phận người ngoài ý muốn,
+tool bị cấm, split-screen, color physics sai, texture sai và sequence sai format.
+Danh sách chính xác luôn lấy từ contract, không lấy từ đoạn mô tả này.
+
+## Readiness và invalidation
+
+- Regenerate keyframe, clip, thumbnail hoặc final video phải xóa receipt và
+  marker tương ứng.
+- Chỉ pipeline mới ghi `video_qa_manifest.json` sau khi keyframe, L2, thumbnail
+  và L3 đều có receipt hợp lệ.
+- `READY_LOCAL` không phải trạng thái upload/publish. Nó chỉ chứng minh artifact
+  local hiện tại đã qua đủ gate.
+- Facebook publishing là `manual-only`; skill này không cấp quyền upload hoặc
+  publish.
