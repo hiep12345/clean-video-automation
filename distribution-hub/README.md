@@ -28,6 +28,8 @@ npm run dev
 ```
 
 The local Cloudflare D1 database is initialized with demo data on first access.
-Production requires `DISTRIBUTION_ADMIN_EMAIL` as the immutable owner/admin
-bootstrap identity. Additional members are provisioned through the Team panel;
-their emails and channel assignments are never hard-coded in source.
+Production accepts a comma-separated `DISTRIBUTION_ADMIN_EMAILS` allowlist for
+immutable bootstrap administrators. The legacy single-value
+`DISTRIBUTION_ADMIN_EMAIL` remains supported. Additional members are
+provisioned through the Team panel; their emails and channel assignments are
+never hard-coded in source.

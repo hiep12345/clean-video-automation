@@ -44,7 +44,8 @@ test("team access is dynamic and enforced by channel on the server", async () =>
   assert.match(teamRoute, /resolveMembership/);
   assert.match(teamStore, /channel_assignments/);
   assert.match(teamStore, /Only an admin can manage team assignments/);
-  assert.match(teamStore, /DISTRIBUTION_ADMIN_EMAIL/);
+  assert.match(teamStore, /DISTRIBUTION_ADMIN_EMAILS/);
+  assert.match(teamStore, /split\(","\)/);
   assert.match(control, /not assigned to channel/);
   assert.match(control, /Viewer accounts cannot change upload state/);
   assert.match(client, /Assignment is stored in the database/);

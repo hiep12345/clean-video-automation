@@ -38,11 +38,21 @@ function database(): D1Database {
   return env.DB;
 }
 
-function configuredAdminEmail(): string | null {
+function configuredAdminEmails(): Set<string> {
   const runtime = env as unknown as {
     DISTRIBUTION_ADMIN_EMAIL?: string;
+    DISTRIBUTION_ADMIN_EMAILS?: string;
   };
-  return runtime.DISTRIBUTION_ADMIN_EMAIL?.trim().toLowerCase() || null;
+  const values = [
+    runtime.DISTRIBUTION_ADMIN_EMAIL,
+    runtime.DISTRIBUTION_ADMIN_EMAILS,
+  ];
+  return new Set(
+    values
+      .flatMap((value) => value?.split(",") ?? [])
+      .map((email) => email.trim().toLowerCase())
+      .filter(Boolean),
+  );
 }
 
 function normalizeEmail(value: string): string {
@@ -98,10 +108,10 @@ export async function resolveMembership(
   identity: RequestIdentity,
 ): Promise<MemberContext> {
   const db = database();
-  const adminEmail = configuredAdminEmail();
+  const adminEmails = configuredAdminEmails();
   const isLocalAdmin =
     identity.isLocal && identity.email === "local.preview@distribution-hub";
-  const isConfiguredAdmin = adminEmail === identity.email;
+  const isConfiguredAdmin = adminEmails.has(identity.email);
 
   if (isLocalAdmin || isConfiguredAdmin) {
     const now = new Date().toISOString();
@@ -219,12 +229,15 @@ export async function saveTeamMember(
     return { member: await mapMember(replayedMember), replayed: true };
   }
 
-  const configuredAdmin = configuredAdminEmail();
+  const configuredAdmins = configuredAdminEmails();
   if (
-    configuredAdmin === email &&
+    configuredAdmins.has(email) &&
     (!input.active || input.role !== "ADMIN")
   ) {
-    throw new ActionError(409, "The configured owner must remain an active admin");
+    throw new ActionError(
+      409,
+      "Configured administrators must remain active admins",
+    );
   }
 
   const current = await rawMember(email);
