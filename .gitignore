@@ -25,6 +25,9 @@ graphify-out/
 .agents/state/
 test.png
 
+# Extracted standalone application (lives at ../distribution-hub)
+/distribution-hub/
+
 # OS generated files
 .DS_Store
 .DS_Store?
