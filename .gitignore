@@ -22,8 +22,7 @@ node_modules/
 scratch/
 output/
 graphify-out/
-.agents/state/*.db*
-.agents/state/backups/
+.agents/state/
 test.png
 
 # OS generated files
