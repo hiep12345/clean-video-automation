@@ -1055,6 +1055,31 @@ h1 {
   font-size: 13px;
 }
 
+.field-help,
+.field-error,
+.field-success {
+  font-size: 11px;
+  font-weight: 500;
+  line-height: 1.45;
+}
+
+.field-help {
+  color: var(--muted);
+}
+
+.field-error {
+  color: var(--red);
+}
+
+.field-success {
+  color: var(--green);
+}
+
+.job-form input[aria-invalid="true"] {
+  border-color: #fca5a5;
+  background: #fffafa;
+}
+
 .job-form input:focus,
 .job-form select:focus {
   border-color: #93c5fd;
@@ -1117,6 +1142,25 @@ h1 {
   font-weight: 700;
 }
 
+.receipt-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 12px;
+  margin-top: 9px;
+}
+
+.receipt-meta span {
+  color: #166534;
+  font-size: 11px;
+}
+
+.receipt-meta code,
+.receipt-id-line code,
+.alias-list code {
+  font-family: var(--font-geist-mono), monospace;
+  font-size: 11px;
+}
+
 .audit-note {
   margin-top: 22px;
   padding: 14px;
@@ -1143,6 +1187,124 @@ h1 {
 
 .team-drawer {
   width: min(1040px, 96vw);
+}
+
+.mapping-drawer {
+  width: min(920px, 96vw);
+}
+
+.mapping-list {
+  display: grid;
+  gap: 12px;
+  margin-top: 20px;
+}
+
+.mapping-card {
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: #fff;
+  box-shadow: var(--shadow-sm);
+}
+
+.mapping-card-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.mapping-card-head h3 {
+  margin: 7px 0 2px;
+  font-size: 15px;
+}
+
+.mapping-card-head p {
+  margin: 0;
+  color: var(--muted);
+  font: 10px var(--font-geist-mono), monospace;
+}
+
+.mapping-status {
+  flex: 0 0 auto;
+  padding: 5px 9px;
+  border-radius: 999px;
+  background: var(--amber-soft);
+  color: var(--amber);
+  font-size: 10px;
+  font-weight: 750;
+}
+
+.mapping-linked {
+  background: var(--green-soft);
+  color: var(--green);
+}
+
+.receipt-id-line {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  margin: 14px 0;
+  padding: 10px 12px;
+  border-radius: 9px;
+  background: #f8fafc;
+  color: var(--muted-strong);
+  font-size: 11px;
+}
+
+.receipt-id-line a {
+  color: var(--blue);
+  font-weight: 700;
+}
+
+.alias-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+  margin: 0 0 12px;
+}
+
+.alias-list span {
+  padding: 5px 8px;
+  border: 1px solid #bfdbfe;
+  border-radius: 7px;
+  background: var(--blue-soft);
+  color: #1d4ed8;
+  font-size: 10px;
+}
+
+.mapping-form {
+  display: grid;
+  grid-template-columns: minmax(170px, 0.7fr) minmax(170px, 0.8fr) minmax(220px, 1.2fr) auto;
+  align-items: end;
+  gap: 9px;
+}
+
+.mapping-form label {
+  display: grid;
+  gap: 5px;
+  color: var(--muted-strong);
+  font-size: 11px;
+  font-weight: 650;
+}
+
+.mapping-form input,
+.mapping-form select {
+  width: 100%;
+  min-height: 44px;
+  padding: 9px 10px;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  background: #fff;
+  color: var(--ink);
+  font-size: 12px;
+}
+
+.form-feedback {
+  margin: 9px 0 0;
+  color: var(--muted-strong);
+  font-size: 11px;
 }
 
 .team-layout {
@@ -1557,6 +1719,15 @@ h1 {
 
   .form-split {
     grid-template-columns: 1fr;
+  }
+
+  .mapping-form,
+  .receipt-id-line {
+    grid-template-columns: 1fr;
+  }
+
+  .mapping-form .button {
+    width: 100%;
   }
 
   .job-actions .button,

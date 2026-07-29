@@ -140,3 +140,54 @@ test("ingest service identities are signed and explicitly allowlisted", async ()
   assert.match(auth, /service:\$\{principal\.serviceTokenId\}/);
   assert.match(auth, /jwtVerify/);
 });
+
+test("Meta receipts are atomic and analytics mapping stays independent", async () => {
+  const [control, receipts, mappingRoute, aliasRoute, client, migration] =
+    await Promise.all([
+      readFile(new URL("../db/control.ts", import.meta.url), "utf8"),
+      readFile(new URL("../db/receipts.ts", import.meta.url), "utf8"),
+      readFile(
+        new URL("../app/api/mapping-review/route.ts", import.meta.url),
+        "utf8",
+      ),
+      readFile(
+        new URL("../app/api/aliases/ingest/route.ts", import.meta.url),
+        "utf8",
+      ),
+      readFile(new URL("../app/distribution-hub.tsx", import.meta.url), "utf8"),
+      readFile(
+        new URL("../drizzle/0004_peaceful_magik.sql", import.meta.url),
+        "utf8",
+      ),
+    ]);
+
+  assert.match(receipts, /business\.facebook\.com/);
+  assert.match(receipts, /searchParams\.get\("content_id"\)/);
+  assert.match(receipts, /Only an admin can link analytics IDs/);
+  assert.match(receipts, /FACEBOOK_GRAPH_REEL/);
+  assert.match(receipts, /INSTAGRAM_MEDIA/);
+  assert.match(control, /\.\.\.receiptStatements/);
+  assert.match(control, /publication_receipt_events/);
+  assert.match(control, /analyticsLinkStatus:.*"PENDING"/s);
+  assert.match(mappingRoute, /resolveMembership/);
+  assert.match(mappingRoute, /linkPublicationAlias/);
+  assert.match(aliasRoute, /requestIngestPrincipal/);
+  assert.match(aliasRoute, /dedicated Cloudflare Access service token/);
+  assert.match(aliasRoute, /Idempotency-Key header must match/);
+  assert.match(receipts, /publication_alias_ingest_batches/);
+  assert.match(receipts, /facebook-analytics/);
+  assert.match(receipts, /NO_RECEIPT/);
+  assert.match(receipts, /hasRetryableSkips/);
+  assert.match(receipts, /if \(!hasRetryableSkips\)/);
+  assert.match(receipts, /publication_receipt_action_requests/);
+  assert.match(receipts, /request_fingerprint/);
+  assert.match(receipts, /already bound to another mapping request/);
+  assert.doesNotMatch(receipts, /INSERT OR IGNORE INTO publication_aliases/);
+  assert.match(client, /Link Meta Business Suite/);
+  assert.match(client, /content_id/);
+  assert.match(client, /Mapping Meta/);
+  assert.match(migration, /publication_receipts/);
+  assert.match(migration, /publication_aliases/);
+  assert.match(migration, /Meta — Facebook \+ Instagram/);
+  assert.doesNotMatch(control, /notion|Buffer Status/i);
+});

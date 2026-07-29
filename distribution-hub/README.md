@@ -33,6 +33,44 @@ metadata may be refreshed by the production pipeline, but claim, schedule,
 blocked, uploaded, assignee, and receipt states can change only through exact
 Distribution Hub actions. An ingest cannot overwrite those states.
 
+### Meta receipt and analytics identity
+
+Facebook and Instagram remain one operational target (`fb-ig`) because the team
+publishes both destinations together in Meta Business Suite. When a member
+confirms a Meta upload, they paste the Business Suite Insights URL containing
+`content_id`.
+
+The Hub stores three identity namespaces without exposing that complexity to the
+member workflow:
+
+- `META_BUSINESS_CONTENT`: the shared Business Suite receipt ID reported by the
+  member.
+- `FACEBOOK_GRAPH_REEL`: the Facebook Graph object ID used by Facebook
+  analytics.
+- `INSTAGRAM_MEDIA`: the Instagram media ID used by Instagram analytics.
+
+Publication state and analytics-link state are independent. A member receipt
+marks the operational job uploaded while analytics remains `PENDING` until an
+admin or a trusted resolver links provider IDs. Missing analytics mappings never
+change an uploaded job to `BLOCKED`.
+
+`POST /api/aliases/ingest` accepts idempotent Facebook Graph mappings from the
+same allowlisted Cloudflare Access service identity used by production ingest.
+The companion command is dry-run by default:
+
+```powershell
+python content-planner-kb/scripts/distribution_hub_meta_sync.py
+```
+
+After reviewing its exact `MAPPED` rows, send them with:
+
+```powershell
+python content-planner-kb/scripts/distribution_hub_meta_sync.py --apply
+```
+
+Rows without a Hub job or without a member receipt are reported as `NO_JOB` or
+`NO_RECEIPT`; they are never guessed or attached by title.
+
 Before its first network attempt, the production client stores each batch in a
 local SQLite outbox. A timeout or Hub outage leaves the batch `PENDING`; retries
 reuse the same idempotency key. `daily_cleanup.py --with-external-sync` retries

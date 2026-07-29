@@ -7,6 +7,42 @@ export type JobState =
 
 export type BufferState = "READY" | "IN_PROGRESS" | "COMPLETE" | "BLOCKED";
 
+export type PublicationStatus = "REPORTED" | "VERIFIED";
+
+export type AnalyticsLinkStatus =
+  | "PENDING"
+  | "PARTIAL"
+  | "LINKED"
+  | "AMBIGUOUS"
+  | "FAILED";
+
+export type PublicationAliasNamespace =
+  | "META_BUSINESS_CONTENT"
+  | "FACEBOOK_GRAPH_REEL"
+  | "INSTAGRAM_MEDIA";
+
+export type PublicationAlias = {
+  namespace: PublicationAliasNamespace;
+  externalId: string;
+  permalink: string | null;
+  source: string;
+  verifiedAt: string | null;
+};
+
+export type PublicationReceipt = {
+  id: string;
+  provider: "META";
+  metaContentId: string;
+  sourceUrl: string;
+  publicationStatus: PublicationStatus;
+  analyticsLinkStatus: AnalyticsLinkStatus;
+  reportedBy: string;
+  reportedAt: string;
+  verifiedAt: string | null;
+  verificationError: string | null;
+  aliases: PublicationAlias[];
+};
+
 export type DistributionJob = {
   id: string;
   platformCode: string;
@@ -21,6 +57,7 @@ export type DistributionJob = {
   uploadedAt: string | null;
   externalUrl: string | null;
   updatedAt: string;
+  receipt: PublicationReceipt | null;
 };
 
 export type QueueItem = {
@@ -70,6 +107,18 @@ export type TeamChannel = {
 export type TeamResponse = {
   members: TeamMember[];
   channels: TeamChannel[];
+};
+
+export type MappingReviewItem = {
+  receipt: PublicationReceipt;
+  jobId: string;
+  contentId: string;
+  title: string;
+  channelCode: string;
+};
+
+export type MappingReviewResponse = {
+  items: MappingReviewItem[];
 };
 
 export type JobAction =

@@ -8,6 +8,7 @@ import type {
   JobState,
   QueueResponse,
 } from "@/lib/types";
+import { MappingReviewPanel } from "./mapping-review-panel";
 import { TeamPanel } from "./team-panel";
 
 const stateLabel: Record<JobState | BufferState, string> = {
@@ -40,6 +41,25 @@ function StatusPill({ state }: { state: JobState | BufferState }) {
   return <span className={statusClass(state)}>{stateLabel[state]}</span>;
 }
 
+function metaContentId(value: string): string | null {
+  try {
+    const url = new URL(value);
+    const id = url.searchParams.get("content_id") ?? "";
+    if (
+      url.protocol !== "https:" ||
+      !["business.facebook.com", "www.business.facebook.com"].includes(
+        url.hostname.toLowerCase(),
+      ) ||
+      !/^\d{6,30}$/.test(id)
+    ) {
+      return null;
+    }
+    return id;
+  } catch {
+    return null;
+  }
+}
+
 function PlatformMark({ job }: { job: DistributionJob }) {
   return (
     <span className={`platform-mark platform-${job.platformColor}`}>
@@ -63,9 +83,71 @@ type JobPanelProps = {
 
 function JobPanel({ job, actor, busy, onAction }: JobPanelProps) {
   const [publishedUrl, setPublishedUrl] = useState(job.externalUrl ?? "");
+  const [publishedUrlError, setPublishedUrlError] = useState("");
   const [scheduledAt, setScheduledAt] = useState("");
   const [blockedReason, setBlockedReason] = useState("");
   const mine = job.assigneeEmail === actor;
+  const isMeta = job.platformCode === "fb-ig";
+  const parsedMetaContentId = isMeta ? metaContentId(publishedUrl) : null;
+  const canConfirmPublished = isMeta
+    ? Boolean(parsedMetaContentId)
+    : Boolean(publishedUrl);
+
+  function validatePublishedUrl() {
+    if (!publishedUrl) {
+      setPublishedUrlError("");
+    } else if (isMeta && !parsedMetaContentId) {
+      setPublishedUrlError(
+        "Hãy dán URL Insights của Meta Business Suite có tham số content_id.",
+      );
+    } else {
+      setPublishedUrlError("");
+    }
+  }
+
+  const publishedUrlField = (
+    <label>
+      {isMeta ? "Link Meta Business Suite" : "Link bài đã đăng"}
+      <input
+        type="url"
+        value={publishedUrl}
+        onChange={(event) => {
+          setPublishedUrl(event.target.value);
+          if (publishedUrlError) setPublishedUrlError("");
+        }}
+        onBlur={validatePublishedUrl}
+        placeholder={
+          isMeta
+            ? "https://business.facebook.com/...&content_id=..."
+            : "https://..."
+        }
+        aria-describedby={
+          isMeta ? `${job.id}-meta-help ${job.id}-meta-error` : undefined
+        }
+        aria-invalid={Boolean(publishedUrlError)}
+      />
+      {isMeta && (
+        <small id={`${job.id}-meta-help`} className="field-help">
+          Mở Insights của bài trong Meta Business Suite rồi sao chép toàn bộ URL.
+          Hệ thống tự lấy content_id; member không phải nhập ID riêng.
+        </small>
+      )}
+      {publishedUrlError && (
+        <small
+          id={`${job.id}-meta-error`}
+          className="field-error"
+          role="alert"
+        >
+          {publishedUrlError}
+        </small>
+      )}
+      {isMeta && parsedMetaContentId && (
+        <small className="field-success" role="status">
+          Đã nhận content_id: {parsedMetaContentId}
+        </small>
+      )}
+    </label>
+  );
 
   return (
     <section className="job-card">
@@ -110,23 +192,15 @@ function JobPanel({ job, actor, busy, onAction }: JobPanelProps) {
 
       {job.state === "CLAIMED" && mine && (
         <div className="job-form">
-          <label>
-            Link bài đã đăng
-            <input
-              type="url"
-              value={publishedUrl}
-              onChange={(event) => setPublishedUrl(event.target.value)}
-              placeholder="https://facebook.com/..."
-            />
-          </label>
+          {publishedUrlField}
           <button
             className="button button-success"
-            disabled={busy || !publishedUrl}
+            disabled={busy || !canConfirmPublished}
             onClick={() =>
               onAction(job, "upload", { externalUrl: publishedUrl })
             }
           >
-            Xác nhận đã đăng
+            {busy ? "Đang lưu…" : "Xác nhận đã đăng"}
           </button>
           <div className="form-split">
             <label>
@@ -193,23 +267,15 @@ function JobPanel({ job, actor, busy, onAction }: JobPanelProps) {
           </p>
           {mine && (
             <>
-              <label>
-                Link bài đã đăng
-                <input
-                  type="url"
-                  value={publishedUrl}
-                  onChange={(event) => setPublishedUrl(event.target.value)}
-                  placeholder="Dán link bài đăng thực tế"
-                />
-              </label>
+              {publishedUrlField}
               <button
                 className="button button-success"
-                disabled={busy || !publishedUrl}
+                disabled={busy || !canConfirmPublished}
                 onClick={() =>
                   onAction(job, "upload", { externalUrl: publishedUrl })
                 }
               >
-                Xác nhận đã đăng
+                {busy ? "Đang lưu…" : "Xác nhận đã đăng"}
               </button>
             </>
           )}
@@ -232,16 +298,47 @@ function JobPanel({ job, actor, busy, onAction }: JobPanelProps) {
       {job.state === "UPLOADED" && (
         <div className="receipt-box">
           <div>
-            <strong>Đã lưu bằng chứng đăng bài</strong>
+            <strong>
+              {job.receipt
+                ? "Đã lưu Meta publication receipt"
+                : "Đã lưu bằng chứng đăng bài"}
+            </strong>
             <p>
               {job.uploadedAt
                 ? new Date(job.uploadedAt).toLocaleString()
                 : "Recorded"}
             </p>
+            {job.receipt && (
+              <div className="receipt-meta">
+                <span>
+                  content_id <code>{job.receipt.metaContentId}</code>
+                </span>
+                <span>
+                  Đăng bài:{" "}
+                  <b>
+                    {job.receipt.publicationStatus === "REPORTED"
+                      ? "Member đã báo cáo"
+                      : "Đã xác minh"}
+                  </b>
+                </span>
+                <span>
+                  Analytics:{" "}
+                  <b>
+                    {job.receipt.analyticsLinkStatus === "PENDING"
+                      ? "Chờ mapping"
+                      : job.receipt.analyticsLinkStatus === "PARTIAL"
+                        ? "Đã map một phần"
+                        : job.receipt.analyticsLinkStatus === "LINKED"
+                          ? "Đã liên kết"
+                          : "Cần kiểm tra"}
+                  </b>
+                </span>
+              </div>
+            )}
           </div>
           {job.externalUrl && (
             <a href={job.externalUrl} target="_blank" rel="noreferrer">
-              Mở bài đăng ↗
+              {job.receipt ? "Mở Meta Insights ↗" : "Mở bài đăng ↗"}
             </a>
           )}
         </div>
@@ -270,6 +367,7 @@ export function DistributionHub() {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [busyJob, setBusyJob] = useState<string | null>(null);
   const [teamOpen, setTeamOpen] = useState(false);
+  const [mappingReviewOpen, setMappingReviewOpen] = useState(false);
 
   const load = useCallback(async () => {
     try {
@@ -293,13 +391,16 @@ export function DistributionHub() {
   }, [load]);
 
   useEffect(() => {
-    if (!selectedId) return;
+    if (!selectedId && !teamOpen && !mappingReviewOpen) return;
     const closeOnEscape = (event: KeyboardEvent) => {
-      if (event.key === "Escape") setSelectedId(null);
+      if (event.key !== "Escape") return;
+      if (mappingReviewOpen) setMappingReviewOpen(false);
+      else if (teamOpen) setTeamOpen(false);
+      else setSelectedId(null);
     };
     window.addEventListener("keydown", closeOnEscape);
     return () => window.removeEventListener("keydown", closeOnEscape);
-  }, [selectedId]);
+  }, [mappingReviewOpen, selectedId, teamOpen]);
 
   const channels = useMemo(
     () =>
@@ -435,12 +536,20 @@ export function DistributionHub() {
           </div>
           <div className="header-actions">
             {data.membership.canManageTeam && (
-              <button
-                className="button button-secondary"
-                onClick={() => setTeamOpen(true)}
-              >
-                Thành viên
-              </button>
+              <>
+                <button
+                  className="button button-secondary"
+                  onClick={() => setMappingReviewOpen(true)}
+                >
+                  Mapping Meta
+                </button>
+                <button
+                  className="button button-secondary"
+                  onClick={() => setTeamOpen(true)}
+                >
+                  Thành viên
+                </button>
+              </>
             )}
             <button className="button button-secondary" onClick={() => load()}>
               Làm mới
@@ -683,6 +792,12 @@ export function DistributionHub() {
         </div>
       )}
       {teamOpen && <TeamPanel onClose={() => setTeamOpen(false)} />}
+      {mappingReviewOpen && (
+        <MappingReviewPanel
+          onClose={() => setMappingReviewOpen(false)}
+          onChanged={load}
+        />
+      )}
     </main>
   );
 }

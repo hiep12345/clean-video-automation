@@ -5,9 +5,14 @@ import type {
   JobAction,
   JobState,
   MemberContext,
+  PublicationReceipt,
   QueueItem,
 } from "@/lib/types";
 import { ActionError } from "@/lib/errors";
+import {
+  parseMetaBusinessReceiptUrl,
+  receiptSchemaStatements,
+} from "@/db/receipts";
 
 type RawJob = {
   job_id: string;
@@ -32,6 +37,22 @@ type RawJob = {
   uploaded_at: string | null;
   external_url: string | null;
   updated_at: string;
+  receipt_id: string | null;
+  receipt_provider: "META" | null;
+  meta_content_id: string | null;
+  receipt_source_url: string | null;
+  publication_status: "REPORTED" | "VERIFIED" | null;
+  analytics_link_status:
+    | "PENDING"
+    | "PARTIAL"
+    | "LINKED"
+    | "AMBIGUOUS"
+    | "FAILED"
+    | null;
+  reported_by: string | null;
+  reported_at: string | null;
+  receipt_verified_at: string | null;
+  verification_error: string | null;
 };
 
 type ActionInput = {
@@ -153,6 +174,7 @@ const schemaStatements = [
     response_json TEXT NOT NULL,
     created_at TEXT NOT NULL
   )`,
+  ...receiptSchemaStatements,
 ];
 
 function database(): D1Database {
@@ -188,7 +210,17 @@ const latestJobsSql = `
     e.scheduled_at,
     e.uploaded_at,
     e.external_url,
-    e.created_at AS updated_at
+    e.created_at AS updated_at,
+    r.id AS receipt_id,
+    r.provider AS receipt_provider,
+    r.meta_content_id,
+    r.source_url AS receipt_source_url,
+    r.publication_status,
+    r.analytics_link_status,
+    r.reported_by,
+    r.reported_at,
+    r.verified_at AS receipt_verified_at,
+    r.verification_error
   FROM distribution_jobs j
   JOIN content_items c ON c.id = j.content_id
   JOIN channels ch ON ch.id = c.channel_id
@@ -200,6 +232,7 @@ const latestJobsSql = `
      FROM distribution_events last_event
      WHERE last_event.job_id = j.id
    )
+  LEFT JOIN publication_receipts r ON r.job_id = j.id
   ORDER BY ch.code, c.produced_at DESC, c.id, p.code
 `;
 
@@ -218,7 +251,38 @@ function deriveBufferState(jobs: DistributionJob[]): BufferState {
   return "READY";
 }
 
-function mapJob(row: RawJob): DistributionJob {
+function receiptFromRow(row: RawJob): PublicationReceipt | null {
+  if (
+    !row.receipt_id ||
+    !row.receipt_provider ||
+    !row.meta_content_id ||
+    !row.receipt_source_url ||
+    !row.publication_status ||
+    !row.analytics_link_status ||
+    !row.reported_by ||
+    !row.reported_at
+  ) {
+    return null;
+  }
+  return {
+    id: row.receipt_id,
+    provider: row.receipt_provider,
+    metaContentId: row.meta_content_id,
+    sourceUrl: row.receipt_source_url,
+    publicationStatus: row.publication_status,
+    analyticsLinkStatus: row.analytics_link_status,
+    reportedBy: row.reported_by,
+    reportedAt: row.reported_at,
+    verifiedAt: row.receipt_verified_at,
+    verificationError: row.verification_error,
+    aliases: [],
+  };
+}
+
+function mapJob(
+  row: RawJob,
+  receipt: PublicationReceipt | null = receiptFromRow(row),
+): DistributionJob {
   return {
     id: row.job_id,
     platformCode: row.platform_code,
@@ -233,6 +297,7 @@ function mapJob(row: RawJob): DistributionJob {
     uploadedAt: row.uploaded_at,
     externalUrl: row.external_url,
     updatedAt: row.updated_at,
+    receipt,
   };
 }
 
@@ -400,6 +465,8 @@ export async function applyJobAction(input: ActionInput) {
   let scheduledAt = current.scheduled_at;
   let uploadedAt = current.uploaded_at;
   let externalUrl = current.external_url;
+  let receipt = receiptFromRow(current);
+  const receiptStatements: D1PreparedStatement[] = [];
 
   if (input.action === "claim") {
     const activeClaim =
@@ -440,7 +507,105 @@ export async function applyJobAction(input: ActionInput) {
     requireClaim(current, input.actor);
     state = "UPLOADED";
     uploadedAt = new Date().toISOString();
-    externalUrl = validHttpsUrl(input.externalUrl);
+    if (current.platform_code === "fb-ig") {
+      const metaReceipt = parseMetaBusinessReceiptUrl(input.externalUrl);
+      externalUrl = metaReceipt.sourceUrl;
+      const existingForMetaId = await db
+        .prepare(
+          `SELECT id, job_id
+           FROM publication_receipts
+           WHERE provider = 'META' AND meta_content_id = ?`,
+        )
+        .bind(metaReceipt.metaContentId)
+        .first<{ id: string; job_id: string }>();
+      if (existingForMetaId && existingForMetaId.job_id !== input.jobId) {
+        throw new ActionError(
+          409,
+          "This Meta content_id is already attached to another job",
+        );
+      }
+      if (receipt && receipt.metaContentId !== metaReceipt.metaContentId) {
+        throw new ActionError(
+          409,
+          "This job already has a different Meta content_id",
+        );
+      }
+
+      const receiptId = receipt?.id ?? crypto.randomUUID();
+      const reportedAt = receipt?.reportedAt ?? new Date().toISOString();
+      receipt = {
+        id: receiptId,
+        provider: "META",
+        metaContentId: metaReceipt.metaContentId,
+        sourceUrl: metaReceipt.sourceUrl,
+        publicationStatus: receipt?.publicationStatus ?? "REPORTED",
+        analyticsLinkStatus: receipt?.analyticsLinkStatus ?? "PENDING",
+        reportedBy: receipt?.reportedBy ?? input.actor,
+        reportedAt,
+        verifiedAt: receipt?.verifiedAt ?? null,
+        verificationError: receipt?.verificationError ?? null,
+        aliases: [
+          {
+            namespace: "META_BUSINESS_CONTENT",
+            externalId: metaReceipt.metaContentId,
+            permalink: metaReceipt.sourceUrl,
+            source: "MEMBER_REPORT",
+            verifiedAt: null,
+          },
+        ],
+      };
+      if (!current.receipt_id) {
+        receiptStatements.push(
+          db
+            .prepare(
+              `INSERT INTO publication_receipts(
+                 id, job_id, provider, meta_content_id, source_url,
+                 publication_status, analytics_link_status, reported_by,
+                 reported_at, verified_at, verification_error
+               ) VALUES (?, ?, 'META', ?, ?, 'REPORTED', 'PENDING', ?, ?, NULL, NULL)`,
+            )
+            .bind(
+              receiptId,
+              input.jobId,
+              metaReceipt.metaContentId,
+              metaReceipt.sourceUrl,
+              input.actor,
+              reportedAt,
+            ),
+          db
+            .prepare(
+              `INSERT INTO publication_aliases(
+                 id, receipt_id, namespace, external_id, permalink, source,
+                 verified_at, created_at
+               ) VALUES (?, ?, 'META_BUSINESS_CONTENT', ?, ?, 'MEMBER_REPORT', NULL, ?)`,
+            )
+            .bind(
+              crypto.randomUUID(),
+              receiptId,
+              metaReceipt.metaContentId,
+              metaReceipt.sourceUrl,
+              reportedAt,
+            ),
+          db
+            .prepare(
+              `INSERT INTO publication_receipt_events(
+                 id, receipt_id, event_type, actor_email, namespace, external_id,
+                 idempotency_key, created_at
+               ) VALUES (?, ?, 'REPORTED', ?, 'META_BUSINESS_CONTENT', ?, ?, ?)`,
+            )
+            .bind(
+              crypto.randomUUID(),
+              receiptId,
+              input.actor,
+              metaReceipt.metaContentId,
+              `receipt:${input.idempotencyKey}`,
+              reportedAt,
+            ),
+        );
+      }
+    } else {
+      externalUrl = validHttpsUrl(input.externalUrl);
+    }
     claimExpiresAt = null;
   } else if (input.action === "block") {
     if (current.state === "UPLOADED") {
@@ -472,21 +637,25 @@ export async function applyJobAction(input: ActionInput) {
 
   const nextSequence = Number(current.sequence) + 1;
   const createdAt = new Date().toISOString();
-  const nextJob = mapJob({
-    ...current,
-    sequence: nextSequence,
-    state,
-    assignee_email: assignee,
-    claim_expires_at: claimExpiresAt,
-    blocked_reason: blockedReason,
-    scheduled_at: scheduledAt,
-    uploaded_at: uploadedAt,
-    external_url: externalUrl,
-    updated_at: createdAt,
-  });
+  const nextJob = mapJob(
+    {
+      ...current,
+      sequence: nextSequence,
+      state,
+      assignee_email: assignee,
+      claim_expires_at: claimExpiresAt,
+      blocked_reason: blockedReason,
+      scheduled_at: scheduledAt,
+      uploaded_at: uploadedAt,
+      external_url: externalUrl,
+      updated_at: createdAt,
+    },
+    receipt,
+  );
   const responseJson = JSON.stringify(nextJob);
   try {
     await db.batch([
+      ...receiptStatements,
       db
         .prepare(
         `INSERT INTO distribution_events(

@@ -12,7 +12,7 @@ const PLATFORM_REGISTRY: Record<
   string,
   { name: string; color: string }
 > = {
-  "fb-ig": { name: "FB / IG", color: "blue" },
+  "fb-ig": { name: "Meta — Facebook + Instagram", color: "blue" },
   youtube: { name: "YouTube", color: "red" },
   amz: { name: "Amazon", color: "amber" },
 };
