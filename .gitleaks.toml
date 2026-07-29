@@ -1,0 +1,11 @@
+title = "clean-video-automation Gitleaks configuration"
+
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Cloudflare Access audience IDs are public resource identifiers, not credentials"
+condition = "AND"
+regexTarget = "line"
+paths = ['''^distribution-hub/wrangler\.cloudflare\.jsonc$''']
+regexes = ['''^\s*"CF_ACCESS_AUD"\s*:''']

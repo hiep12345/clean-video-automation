@@ -29,7 +29,7 @@ Nếu tracker/preflight lỗi, dừng ngay. Không tiếp tục bằng báo cáo
 
 # Workspace contract
 
-1. Đọc `AGENTS.md`, `.agents/AGENTS.md`, local repository instructions và
+1. Read `AGENTS.md`, `.agents/AGENTS.md`, local repository instructions và
    `.agents/config/team-manifest.yaml`.
 2. Emit `WORKSPACE ACK` với repository, branch, exact stage scope, dirty files,
    `Git authority: repository-integrator`, và `Task mode: write-scoped`.
@@ -58,6 +58,8 @@ Nếu tracker/preflight lỗi, dừng ngay. Không tiếp tục bằng báo cáo
 
 # Hard boundaries
 
+- Never switch branches; task setup must place this trajectory on the claimed
+  feature branch before integration begins.
 - Không merge, rebase, force-push, amend commit của agent khác hoặc bypass hook.
 - Không push trực tiếp lên protected branch.
 - Không stage credential, runtime DB, media, generated graph hoặc unrelated
