@@ -13,12 +13,45 @@ rule or by copying a template's static policy text.
 ## Dynamic sources of truth
 
 1. `content-planner-kb/config/photo-post-profiles.json` is the policy registry.
-   It defines enabled channels, formats, rendering layout, platform rules, QA
-   evidence, and lifecycle gates.
+   It defines enabled channels and formats and is always used to resolve
+   `render_strategy`, layout, evidence requirements, lifecycle gates, and
+   platform policy.
 2. `post.md` supplies the exact `channel` and `format_code` in frontmatter,
-   plus creative content.
-3. The channel template supplies structure only. If it conflicts with the
-   profile, the profile wins.
+   plus the editorial exact-copy fields and creative content.
+3. The channel template is a separate, channel-specific editorial and handoff
+   contract. If it conflicts with the profile registry, the registry wins.
+
+## General operator contract
+
+- Resolve the declared channel and format in the profile registry before
+  explaining, generating, reviewing, or distributing a photo post. Never infer
+  a renderer, evidence rule, lifecycle state, or platform permission from a
+  previous channel run.
+- Keep canonical handoff templates separate by channel:
+  - Botanical Killers:
+    `obsidian-kb/00-Templates/botanical-killers/photo-bk-infographic-v3.md`
+  - Mix Therapy:
+    `obsidian-kb/00-Templates/mix-therapy/photo-mt-recipe-v3.md`
+  - Science Unlocked:
+    `obsidian-kb/00-Templates/science-unlocked/photo-su-scientific-editorial-v2.md`
+- BK, MT, and SU share the one-step, prompt-owned Nano typography method.
+  Their layout and evidence contracts remain channel-specific. Every visible
+  text element comes from the editorial exact-copy fields, appears exactly
+  once, and is rendered in that generation step; agents must not add overlays
+  or invent ad hoc visible copy in the prompt.
+- CD and HD retain the deterministic typography strategy declared by their
+  profiles. Never force one renderer or typography method across all channels.
+- For SU, morphology evidence covers only traits actually observable in the
+  exact reference. Quantitative or count claims use authoritative claim
+  sources and do not require one reference to depict the full quantity.
+  Require two or three callouts that clearly map to an anatomical region or
+  declared visible trait; exact-pixel contact is unnecessary, while an empty
+  or ambiguous target fails. A prompt-native footer rail or shelf may occupy no
+  more than 6% of image height if it does not obscure morphology or become a
+  card, dashboard, or large lower panel/bar.
+- Generation runs only through the production orchestrator and FlowKit, using
+  the user-authorized Google Labs execution path. Do not substitute a paid
+  external generation API. Platform publishing remains `manual-only`.
 
 ## Mandatory preflight
 
@@ -47,7 +80,8 @@ must fail closed.
      --channel <channel> --id <post-id> --json
    ```
 
-3. For an explicitly authorized FlowKit run, add `--execute-flowkit`. The
+3. For an explicitly user-authorized FlowKit run through the Google Labs
+   execution path, add `--execute-flowkit`. The
    command uploads only curated reference files recorded in the bundle's
    `references/reference_pack.json`, then sends their FlowKit media IDs with
    the prompt. Biology references must be imported first through
@@ -58,14 +92,9 @@ must fail closed.
 4. Do not call `batch_gen.py` or `gen_image_post.py` as a user-facing step; they
    are implementation modules behind the orchestrator. Do not hand-copy files
    or create alternate output folders.
-   For Botanical Killers, the active default is `BK-F01-INFOGRAPHIC-V3`: one
-   square `1:1` image (`image.png`) rendered by FlowKit from the editorial
-   prompt. The prompt owns all visible copy (category tag, headline, subline,
-   labels, and footer); code/compositor text overlays are forbidden for V3.
-   `BK-F01-SINGLE` is retained only for historical bundles and is not the
-   current BK production format.
-   The canonical editable template is `obsidian-kb/00-Templates/botanical-killers/photo-bk-infographic-v3.md`; other BK photo templates are archive-only.
-   For Mix Therapy, the active photo template is `obsidian-kb/00-Templates/mix-therapy/photo-mt-single.md`: square `1:1`, prompt-rendered typography, and no code/compositor overlay. The unconfigured carousel template is archive-only.
+   Apply the resolved profile strategy and the channel's canonical handoff
+   template from the general operator contract. Do not reuse another channel's
+   layout, evidence policy, or renderer.
 5. Read the evidence-derived state after every stage:
 
    ```text

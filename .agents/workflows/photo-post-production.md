@@ -8,6 +8,8 @@ description: "Khung chung để tạo, QA và phân phối photo post theo chann
 Use this workflow for every request to create, review, explain, prepare, or
 distribute a photo post. Never answer from memory: resolve the declared channel
 and format through `content-planner-kb/config/photo-post-profiles.json` first.
+The resolved profile always controls `render_strategy`, evidence requirements,
+lifecycle gates, and platform policy.
 
 ## Required inputs
 
@@ -36,11 +38,42 @@ python content-planner-kb/scripts/photo_post_produce.py \
 ```
 
 Add `--execute-flowkit` only after the reference pack has been curated and the
-user has authorized the FlowKit run. The orchestrator performs preflight,
-materialization, reference validation, FlowKit request, asset validation, and
-receipt-backed state transitions in that order. Direct calls to `batch_gen.py`
-or `gen_image_post.py` are implementation details and are not valid workflow
-steps.
+user has authorized the FlowKit run through the Google Labs execution path.
+The orchestrator performs preflight, materialization, reference validation,
+FlowKit request, asset validation, and receipt-backed state transitions in that
+order. Direct calls to `batch_gen.py` or `gen_image_post.py` are implementation
+details and are not valid workflow steps. Never substitute a paid external
+generation API.
+
+### Channel contracts
+
+Templates remain separate per channel because they are editorial and handoff
+contracts, not a replacement for the profile registry:
+
+- Botanical Killers:
+  `obsidian-kb/00-Templates/botanical-killers/photo-bk-infographic-v3.md`
+- Mix Therapy:
+  `obsidian-kb/00-Templates/mix-therapy/photo-mt-recipe-v3.md`
+- Science Unlocked:
+  `obsidian-kb/00-Templates/science-unlocked/photo-su-scientific-editorial-v2.md`
+
+BK, MT, and SU use the one-step, prompt-owned Nano typography method declared
+by their profiles, but retain distinct channel layouts and evidence contracts.
+All visible copy must come from the editorial exact-copy fields and be rendered
+exactly once in that generation step. Agents must not add a compositor overlay
+or invent ad hoc visible copy in the prompt.
+
+CD and HD keep the deterministic typography strategy declared by their
+profiles. Never force one renderer or typography method across all channels.
+
+For SU, visual morphology evidence is limited to traits actually observable in
+the exact reference. Quantitative or count claims are verified separately
+through authoritative claim sources; a single morphology reference need not
+show the full claimed quantity. Use two or three clear callouts mapped to an
+anatomical region or declared visible trait. Exact-pixel contact is not
+required, but an empty or ambiguous target fails. A prompt-native footer rail
+or shelf is allowed only at no more than 6% of image height, without morphology
+occlusion and without becoming a card, dashboard, or large lower panel/bar.
 
 ### Short quantity trigger
 
@@ -62,14 +95,6 @@ first failed gate unless the user explicitly requests continue-on-error.
 
 The completion report must be per ID. Only `READY` IDs count as completed;
 missing or stale evidence is a blocker, never a batch-level PASS.
-
-For Botanical Killers, resolve the current profile before generation:
-`BK-F01-INFOGRAPHIC-V3` is a single square `1:1` infographic. FlowKit receives
-the complete editorial prompt and renders every visible text element; do not
-add text with a compositor or create a second image variant. The legacy
-`BK-F01-SINGLE` profile is for historical/quarantined material only.
-The only active BK photo template is `obsidian-kb/00-Templates/botanical-killers/photo-bk-infographic-v3.md`.
-For Mix Therapy, use `obsidian-kb/00-Templates/mix-therapy/photo-mt-single.md`: square `1:1`, all visible copy rendered by the FlowKit prompt, and no compositor overlay. Do not use the archived carousel template unless a profile is explicitly enabled.
 
 The profile, not the template, controls format, aspect ratio, output name,
 text layout, platform caption limits, disclosure/CTA policy, QA evidence, and
@@ -142,7 +167,8 @@ trajectory. A plausible receipt without those bindings is
 9. Publication receipt plus uploaded flag: `UPLOADED`.
 
 Only `READY` may enter Drive/Notion Buffer. `UNVERIFIED_LEGACY` is blocked
-from every downstream gate. The completion report must print per-ID `state`,
+from every downstream gate. Platform publishing remains `manual-only`. The
+completion report must print per-ID `state`,
 `bundle_path`, `asset path`, and QA/Drive receipts. Missing
 receipt means `not performed`, never an inferred success.
 
