@@ -43,18 +43,21 @@ sang kênh khác.
 
 1. Xác nhận artifact tồn tại, không rỗng và là bản cần review.
 2. Tải review contract động cho đúng gate và `format_id`.
-3. Đối chiếu `review_requirements` với năng lực tool đang có trong session và
+3. Nếu contract có `artifact_contract`, chạy technical validation trên chính
+   artifact gốc. Không tự khai format, mode, kích thước hoặc aspect ratio bằng
+   quan sát; receipt phải ghi đúng kết quả chuẩn hóa do validator trả về.
+4. Đối chiếu `review_requirements` với năng lực tool đang có trong session và
    chọn phương pháp review theo mục “Chọn công cụ theo năng lực” bên dưới.
-4. Xem artifact đủ modality và timeline mà contract yêu cầu. Với video L2/L3,
+5. Xem artifact đủ modality và timeline mà contract yêu cầu. Với video L2/L3,
    phải đánh giá chuyển động trên toàn timeline; L3 phải đánh giá cả audio.
    Không được suy diễn toàn bộ video từ thumbnail hoặc vài frame đại diện.
-5. Đánh giá toàn bộ rule trong contract. Một hard fail không được bù bằng điểm
+6. Đánh giá toàn bộ rule trong contract. Một hard fail không được bù bằng điểm
    trung bình.
-6. Tạo JSON receipt ở trạng thái thực tế. Chỉ dùng `verdict: "PASS"` khi mọi
+7. Tạo JSON receipt ở trạng thái thực tế. Chỉ dùng `verdict: "PASS"` khi mọi
    rule bắt buộc là `PASS`, không có hard fail và điểm đạt threshold.
-7. Parent approver xem lại artifact và receipt, sau đó mới điền
+8. Parent approver xem lại artifact và receipt, sau đó mới điền
    `parent_approval_session_id`.
-8. Gọi `validate_receipt(...)` với đúng artifact. Chỉ sau khi validation thành
+9. Gọi `validate_receipt(...)` với đúng artifact. Chỉ sau khi validation thành
    công mới ghi marker `PASS`.
 
 Marker `.review` chỉ là tín hiệu phối hợp; JSON receipt gắn SHA-256 mới là bằng
@@ -91,7 +94,11 @@ một case cụ thể.
 
 ## Tên file
 
-| Gate | Artifact | JSON receipt | Marker |
+Các tên dưới đây là mặc định legacy. Khi gate có `artifact_contract`, các trường
+`path`, `receipt_path` và `marker_path` trong contract là nguồn có thẩm quyền;
+reviewer không được tự đổi tên.
+
+| Gate | Artifact mặc định | JSON receipt mặc định | Marker mặc định |
 |---|---|---|---|
 | keyframe | `scene_*_keyframe.jpg` | cùng stem, đuôi `.qa.json` | cùng stem, đuôi `.review` |
 | L2 | `scene_*.mp4` | cùng stem, đuôi `.qa.json` | cùng stem, đuôi `.review` |
@@ -102,13 +109,13 @@ Receipt được phép theo artifact qua thao tác copy/rename nếu SHA-256 và
 `size_bytes` vẫn khớp. Bất kỳ thay đổi nội dung nào của artifact đều làm receipt
 cũ mất hiệu lực.
 
-## Receipt schema v3
+## Receipt schema v4
 
 Mọi trường dưới đây là bắt buộc với kênh đã bật `qa_policy`:
 
 ```json
 {
-  "schema_version": 3,
+  "schema_version": 4,
   "policy_version": "<qa_policy.policy_version>",
   "video_id": "<video directory name>",
   "channel": "<channel slug>",
@@ -118,6 +125,14 @@ Mọi trường dưới đây là bắt buộc với kênh đã bật `qa_policy
     "path": "<path or filename reviewed>",
     "sha256": "<uppercase SHA-256>",
     "size_bytes": 123456
+  },
+  "technical_validation": {
+    "media_type": "image",
+    "format": "<detected format>",
+    "mode": "<detected color mode>",
+    "width": 900,
+    "height": 1600,
+    "aspect_ratio": "9:16"
   },
   "reviewer_session_id": "<reviewer session>",
   "parent_approval_session_id": "<different parent session>",
@@ -154,6 +169,13 @@ Quy tắc schema:
   artifact.
 - `artifact.sha256` và `artifact.size_bytes` phải được tính từ đúng artifact
   sau cùng.
+- Gate không có `artifact_contract` không cần `technical_validation`. Gate có
+  contract phải ghi đúng toàn bộ technical result do
+  `validate_artifact_contract(...)` tính từ file hiện tại; sai một trường phải
+  fail-closed.
+- Với thumbnail, technical validation kiểm tra filename, khả năng decode,
+  dung lượng tối thiểu, image format, color mode, kích thước và aspect ratio
+  theo config. Technical PASS không thay thế semantic review.
 - `review_execution.selection_strategy` phải là `capability_driven`.
 - Hợp các `modalities` trong `review_execution.tools` phải bao phủ mọi modality
   contract yêu cầu. Gate yêu cầu full timeline phải có temporal tool ghi
@@ -185,9 +207,12 @@ Danh sách chính xác luôn lấy từ contract, không lấy từ đoạn mô 
 ## Readiness và invalidation
 
 - Regenerate keyframe, clip, thumbnail hoặc final video phải xóa receipt và
-  marker tương ứng.
+  marker tương ứng cùng readiness manifest cũ.
 - Chỉ pipeline mới ghi `video_qa_manifest.json` sau khi keyframe, L2, thumbnail
   và L3 đều có receipt hợp lệ.
+- `video_qa_manifest.json` phải gắn hash của `script.md`, final video, từng
+  artifact và từng receipt. Resume hoặc publish phải revalidate các hash hiện
+  tại; không được tin riêng chuỗi trạng thái `READY_LOCAL`.
 - `READY_LOCAL` không phải trạng thái upload/publish. Nó chỉ chứng minh artifact
   local hiện tại đã qua đủ gate.
 - Facebook publishing là `manual-only`; skill này không cấp quyền upload hoặc
