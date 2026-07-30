@@ -43,19 +43,51 @@ sang kênh khác.
 
 1. Xác nhận artifact tồn tại, không rỗng và là bản cần review.
 2. Tải review contract động cho đúng gate và `format_id`.
-3. Xem artifact đầy đủ. Với video, xem cả chuyển động, frame cuối và audio;
-   không chỉ xem thumbnail hoặc vài frame đại diện.
-4. Đánh giá toàn bộ rule trong contract. Một hard fail không được bù bằng điểm
+3. Đối chiếu `review_requirements` với năng lực tool đang có trong session và
+   chọn phương pháp review theo mục “Chọn công cụ theo năng lực” bên dưới.
+4. Xem artifact đủ modality và timeline mà contract yêu cầu. Với video L2/L3,
+   phải đánh giá chuyển động trên toàn timeline; L3 phải đánh giá cả audio.
+   Không được suy diễn toàn bộ video từ thumbnail hoặc vài frame đại diện.
+5. Đánh giá toàn bộ rule trong contract. Một hard fail không được bù bằng điểm
    trung bình.
-5. Tạo JSON receipt ở trạng thái thực tế. Chỉ dùng `verdict: "PASS"` khi mọi
+6. Tạo JSON receipt ở trạng thái thực tế. Chỉ dùng `verdict: "PASS"` khi mọi
    rule bắt buộc là `PASS`, không có hard fail và điểm đạt threshold.
-6. Parent approver xem lại artifact và receipt, sau đó mới điền
+7. Parent approver xem lại artifact và receipt, sau đó mới điền
    `parent_approval_session_id`.
-7. Gọi `validate_receipt(...)` với đúng artifact. Chỉ sau khi validation thành
+8. Gọi `validate_receipt(...)` với đúng artifact. Chỉ sau khi validation thành
    công mới ghi marker `PASS`.
 
 Marker `.review` chỉ là tín hiệu phối hợp; JSON receipt gắn SHA-256 mới là bằng
 chứng có thẩm quyền.
+
+## Chọn công cụ theo năng lực
+
+Review method phải được chọn ở runtime theo năng lực thực tế của model/session,
+không theo danh sách tên tool hard-code:
+
+1. Đọc `review_requirements.required_modalities` và
+   `review_requirements.require_full_timeline` từ contract.
+2. Kiểm tra các tool hiện có và ưu tiên tool cho phép model xem/nghe trực tiếp
+   artifact gốc (`artifact_access: "native"`), đặc biệt khi tool hỗ trợ temporal
+   reasoning trên toàn video.
+3. Có thể phối hợp nhiều tool để đủ visual, temporal và audio. Receipt phải ghi
+   đúng tool nào cung cấp modality nào; không được khai modality chưa review.
+4. Chỉ tạo frame, contact sheet, waveform, transcript hoặc artifact dẫn xuất
+   (`artifact_access: "derived"`) khi session không có năng lực native cần
+   thiết hoặc tool native lỗi sau khi đã thử hợp lý.
+5. Khi phải fallback, cách lấy bằng chứng phải thích ứng với duration, shot
+   boundary, motion và rule cần kiểm tra. Không cấu hình cố định FPS, số frame
+   hay timestamp theo channel/video.
+6. Derived evidence không tự chứng minh full temporal coverage. Nếu contract
+   yêu cầu toàn timeline, chuỗi tool được ghi trong receipt vẫn phải cung cấp
+   modality `temporal` với `timeline_coverage: "full"`; nếu không, gate phải
+   fail-closed.
+7. Mọi fallback phải ghi `fallback_reason` và `limitations` cụ thể để parent
+   approver biết phần nào có thể chưa quan sát trực tiếp.
+
+Tên tool trong receipt là bằng chứng thực thi, không phải cấu hình routing.
+Policy và skill không được rẽ nhánh theo tên model, channel slug, video ID hay
+một case cụ thể.
 
 ## Tên file
 
@@ -70,13 +102,13 @@ Receipt được phép theo artifact qua thao tác copy/rename nếu SHA-256 và
 `size_bytes` vẫn khớp. Bất kỳ thay đổi nội dung nào của artifact đều làm receipt
 cũ mất hiệu lực.
 
-## Receipt schema v2
+## Receipt schema v3
 
 Mọi trường dưới đây là bắt buộc với kênh đã bật `qa_policy`:
 
 ```json
 {
-  "schema_version": 2,
+  "schema_version": 3,
   "policy_version": "<qa_policy.policy_version>",
   "video_id": "<video directory name>",
   "channel": "<channel slug>",
@@ -92,6 +124,20 @@ Mọi trường dưới đây là bắt buộc với kênh đã bật `qa_policy
   "qa_score": 8.5,
   "verdict": "PASS",
   "hard_fail_codes": [],
+  "review_execution": {
+    "selection_strategy": "capability_driven",
+    "tools": [
+      {
+        "tool": "<runtime tool identifier>",
+        "method": "<native media, browser playback, or adaptive fallback>",
+        "artifact_access": "native",
+        "modalities": ["visual", "temporal", "audio"],
+        "timeline_coverage": "full"
+      }
+    ],
+    "fallback_reason": null,
+    "limitations": []
+  },
   "checklist_results": {
     "<every rule ID from review contract>": "PASS"
   },
@@ -108,6 +154,13 @@ Quy tắc schema:
   artifact.
 - `artifact.sha256` và `artifact.size_bytes` phải được tính từ đúng artifact
   sau cùng.
+- `review_execution.selection_strategy` phải là `capability_driven`.
+- Hợp các `modalities` trong `review_execution.tools` phải bao phủ mọi modality
+  contract yêu cầu. Gate yêu cầu full timeline phải có temporal tool ghi
+  `timeline_coverage: "full"`.
+- Tool đọc artifact dẫn xuất phải dùng `artifact_access: "derived"` và receipt
+  phải có `fallback_reason` cùng ít nhất một `limitations`. Không được ghi
+  `native` cho contact sheet, frame trích xuất, waveform hoặc transcript.
 - `checklist_results` phải chứa mọi rule ID mà review contract yêu cầu.
 - `observations` phải là object và mô tả bằng chứng cụ thể, không dùng nhận xét
   chung chung để thay checklist.
