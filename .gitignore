@@ -22,7 +22,9 @@ node_modules/
 scratch/
 output/
 graphify-out/
+.worktrees/
 .agents/state/
+.agents/results/
 test.png
 
 # Extracted standalone application (lives at ../distribution-hub)
