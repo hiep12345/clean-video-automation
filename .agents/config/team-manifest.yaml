@@ -3,6 +3,22 @@
   "team": "antigravity-autonomous-team",
   "default_host": "antigravity-2",
   "default_lease_minutes": 15,
+  "task_tracker": {
+    "mutation_mode": "enforce",
+    "canonical_database_relative": ".agents/state/task_agent.db",
+    "allow_environment_downgrade": false,
+    "dispatch_evidence": {
+      "required_keys": [
+        "dispatch_required",
+        "dispatch_expected_role",
+        "dispatch_expected_trajectory",
+        "dispatch_conversation_id",
+        "dispatch_work_order_sha256",
+        "dispatch_handshake_state"
+      ],
+      "claim_allowed_state": "ACKNOWLEDGED"
+    }
+  },
   "risk_tiers": {
     "0": {
       "description": "Read-only explanation or inspection",

@@ -2,6 +2,15 @@
   "schema_version": 1,
   "handover_warning_steps": 70,
   "handover_required_steps": 80,
+  "handover_acknowledgement": {
+    "schema_version": 1,
+    "hash_algorithm": "sha256",
+    "allowed_actions_while_blocked": [
+      "heartbeat",
+      "handoff",
+      "handover-ack"
+    ]
+  },
   "stale_review_days": 30,
   "scan_receipts": true,
   "quick_check": false,
