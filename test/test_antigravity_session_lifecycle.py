@@ -19,6 +19,18 @@ sys.modules[SPEC.name] = scanner
 SPEC.loader.exec_module(scanner)
 
 
+def policy(**overrides):
+    values = {
+        "handover_warning_steps": 70,
+        "handover_required_steps": 80,
+        "handover_ack_schema_version": 1,
+        "handover_hash_algorithm": "sha256",
+        "handover_allowed_actions": ("heartbeat", "handoff", "handover-ack"),
+    }
+    values.update(overrides)
+    return scanner.Policy(**values)
+
+
 def create_conversation(
     antigravity_root: Path,
     *,
@@ -79,6 +91,15 @@ class SessionLifecycleScannerTests(unittest.TestCase):
                 {
                     "handover_warning_steps": 70,
                     "handover_required_steps": 80,
+                    "handover_acknowledgement": {
+                        "schema_version": 1,
+                        "hash_algorithm": "sha256",
+                        "allowed_actions_while_blocked": [
+                            "heartbeat",
+                            "handoff",
+                            "handover-ack",
+                        ],
+                    },
                     "stale_review_days": 14,
                     "explicit_protected_cascade_ids": [],
                 }
@@ -113,7 +134,7 @@ class SessionLifecycleScannerTests(unittest.TestCase):
         report = scanner.build_report(
             workspace_root=self.workspace,
             antigravity_root=self.antigravity,
-            policy=scanner.Policy(scan_receipts=False),
+            policy=policy(scan_receipts=False),
             tasks=tasks,
             now=self.now,
         )
@@ -138,7 +159,7 @@ class SessionLifecycleScannerTests(unittest.TestCase):
         scanner.build_report(
             workspace_root=self.workspace,
             antigravity_root=self.antigravity,
-            policy=scanner.Policy(scan_receipts=False, quick_check=True),
+            policy=policy(scan_receipts=False, quick_check=True),
             tasks=[],
             now=self.now,
         )
@@ -184,7 +205,7 @@ class SessionLifecycleScannerTests(unittest.TestCase):
         report = scanner.build_report(
             workspace_root=self.workspace,
             antigravity_root=self.antigravity,
-            policy=scanner.Policy(),
+            policy=policy(),
             tasks=tasks,
             now=self.now,
         )
@@ -206,14 +227,14 @@ class SessionLifecycleScannerTests(unittest.TestCase):
         report = scanner.build_report(
             workspace_root=self.workspace,
             antigravity_root=self.antigravity,
-            policy=scanner.Policy(scan_receipts=False),
+            policy=policy(scan_receipts=False),
             tasks=[],
             now=self.now,
         )
         record = report["conversations"][0]
         self.assertEqual(record["lifecycle"], "HANDOVER_DUE")
         self.assertIn(
-            "handover acknowledgement not implemented",
+            "hash-bound handover acknowledgement required",
             record["archive_blockers"],
         )
 
@@ -229,7 +250,7 @@ class SessionLifecycleScannerTests(unittest.TestCase):
         report = scanner.build_report(
             workspace_root=self.workspace,
             antigravity_root=self.antigravity,
-            policy=scanner.Policy(scan_receipts=False),
+            policy=policy(scan_receipts=False),
             tasks=[],
             current_cascade_ids=[cascade],
             now=self.now,
@@ -244,7 +265,7 @@ class SessionLifecycleScannerTests(unittest.TestCase):
         report = scanner.build_report(
             workspace_root=self.workspace,
             antigravity_root=self.antigravity,
-            policy=scanner.Policy(scan_receipts=False),
+            policy=policy(scan_receipts=False),
             tasks=[],
             now=self.now,
         )
@@ -253,6 +274,75 @@ class SessionLifecycleScannerTests(unittest.TestCase):
         self.assertIn(
             "store health is CONVERSATION_DB_MISSING",
             record["archive_blockers"],
+        )
+
+    def test_required_threshold_blocks_new_work_but_allows_control_actions(self) -> None:
+        configured = policy(
+            handover_warning_steps=3,
+            handover_required_steps=5,
+            handover_allowed_actions=("heartbeat", "handoff"),
+        )
+        self.assertTrue(
+            scanner.evaluate_handover_gate(
+                configured, step_count=4, action="new-work"
+            )["allowed"]
+        )
+        for action in ("heartbeat", "handoff"):
+            self.assertTrue(
+                scanner.evaluate_handover_gate(
+                    configured, step_count=5, action=action
+                )["allowed"]
+            )
+        blocked = scanner.evaluate_handover_gate(
+            configured, step_count=5, action="new-work"
+        )
+        self.assertFalse(blocked["allowed"])
+        self.assertIn(
+            "hash_bound_handover_acknowledgement_required", blocked["issues"]
+        )
+
+    def test_hash_bound_acknowledgement_allows_only_exact_successor(self) -> None:
+        configured = policy(handover_warning_steps=3, handover_required_steps=5)
+        cascade = "11111111-1111-4111-8111-111111111111"
+        source = "22222222-2222-4222-8222-222222222222"
+        successor = "33333333-3333-4333-8333-333333333333"
+        work_order_sha256 = "a" * 64
+        acknowledgement = scanner.build_handover_acknowledgement(
+            configured,
+            cascade_id=cascade,
+            source_trajectory_id=source,
+            successor_trajectory_id=successor,
+            observed_step_count=5,
+            work_order_sha256=work_order_sha256,
+        )
+        allowed = scanner.evaluate_handover_gate(
+            configured,
+            step_count=5,
+            action="dispatch",
+            acknowledgement=acknowledgement,
+            cascade_id=cascade,
+            source_trajectory_id=source,
+            successor_trajectory_id=successor,
+            work_order_sha256=work_order_sha256,
+        )
+        self.assertTrue(allowed["allowed"])
+        tampered = dict(acknowledgement)
+        tampered["successor_trajectory_id"] = (
+            "44444444-4444-4444-8444-444444444444"
+        )
+        denied = scanner.evaluate_handover_gate(
+            configured,
+            step_count=5,
+            action="dispatch",
+            acknowledgement=tampered,
+            cascade_id=cascade,
+            source_trajectory_id=source,
+            successor_trajectory_id=successor,
+            work_order_sha256=work_order_sha256,
+        )
+        self.assertFalse(denied["allowed"])
+        self.assertTrue(
+            any("successor_trajectory_id" in issue for issue in denied["issues"])
         )
 
     def test_deletion_cleanup_scan_counts_unique_ids(self) -> None:

@@ -15,6 +15,8 @@ databases with SQLite ``mode=ro`` plus ``PRAGMA query_only``.
 from __future__ import annotations
 
 import argparse
+import hashlib
+import hmac
 import json
 import os
 import re
@@ -42,6 +44,10 @@ DELETION_CLEANUP_RE = re.compile(
     r"([0-9a-fA-F-]{36}) loaded for deletion cleanup"
 )
 ACTIVE_TASK_STATUSES = frozenset({"PENDING", "IN_PROGRESS"})
+DEFAULT_RECEIPT_GLOBS = (
+    "content-planner-kb/output/fb-posts/**/generation_receipt.json",
+    "content-planner-kb/output/fb-posts/**/review_results.json",
+)
 
 
 class ScannerError(RuntimeError):
@@ -50,16 +56,16 @@ class ScannerError(RuntimeError):
 
 @dataclass(frozen=True)
 class Policy:
+    handover_warning_steps: int
+    handover_required_steps: int
+    handover_ack_schema_version: int
+    handover_hash_algorithm: str
+    handover_allowed_actions: tuple[str, ...]
     schema_version: int = 1
-    handover_warning_steps: int = 70
-    handover_required_steps: int = 80
     stale_review_days: int = 30
     scan_receipts: bool = True
     quick_check: bool = False
-    receipt_globs: tuple[str, ...] = (
-        "content-planner-kb/output/fb-posts/**/generation_receipt.json",
-        "content-planner-kb/output/fb-posts/**/review_results.json",
-    )
+    receipt_globs: tuple[str, ...] = DEFAULT_RECEIPT_GLOBS
     explicit_protected_cascade_ids: tuple[str, ...] = ()
 
 
@@ -122,8 +128,14 @@ def load_policy(path: Path) -> Policy:
     if not isinstance(raw, dict):
         raise ScannerError("Policy root must be an object")
 
-    warning = int(raw.get("handover_warning_steps", 70))
-    required = int(raw.get("handover_required_steps", 80))
+    try:
+        warning = int(raw["handover_warning_steps"])
+        required = int(raw["handover_required_steps"])
+    except (KeyError, TypeError, ValueError) as exc:
+        raise ScannerError(
+            "Policy requires numeric handover_warning_steps and "
+            "handover_required_steps"
+        ) from exc
     stale_days = int(raw.get("stale_review_days", 30))
     if warning < 1 or required < warning:
         raise ScannerError(
@@ -133,11 +145,36 @@ def load_policy(path: Path) -> Policy:
     if stale_days < 1:
         raise ScannerError("stale_review_days must be positive")
 
+    acknowledgement = raw.get("handover_acknowledgement")
+    if not isinstance(acknowledgement, dict):
+        raise ScannerError("Policy requires handover_acknowledgement")
+    try:
+        acknowledgement_schema = int(acknowledgement["schema_version"])
+    except (KeyError, TypeError, ValueError) as exc:
+        raise ScannerError(
+            "handover_acknowledgement.schema_version must be an integer"
+        ) from exc
+    hash_algorithm = str(acknowledgement.get("hash_algorithm", "")).strip().lower()
+    if hash_algorithm not in hashlib.algorithms_available:
+        raise ScannerError(
+            "handover_acknowledgement.hash_algorithm is unsupported"
+        )
+    allowed_actions = tuple(
+        str(item).strip().lower()
+        for item in acknowledgement.get("allowed_actions_while_blocked", [])
+        if str(item).strip()
+    )
+    if not allowed_actions or len(allowed_actions) != len(set(allowed_actions)):
+        raise ScannerError(
+            "handover_acknowledgement.allowed_actions_while_blocked must be "
+            "a non-empty unique list"
+        )
+
     receipt_globs = tuple(
         str(item)
         for item in raw.get(
             "receipt_globs",
-            list(Policy.receipt_globs),
+            list(DEFAULT_RECEIPT_GLOBS),
         )
     )
     protected = _validate_uuid_list(
@@ -148,12 +185,139 @@ def load_policy(path: Path) -> Policy:
         schema_version=int(raw.get("schema_version", 1)),
         handover_warning_steps=warning,
         handover_required_steps=required,
+        handover_ack_schema_version=acknowledgement_schema,
+        handover_hash_algorithm=hash_algorithm,
+        handover_allowed_actions=allowed_actions,
         stale_review_days=stale_days,
         scan_receipts=bool(raw.get("scan_receipts", True)),
         quick_check=bool(raw.get("quick_check", False)),
         receipt_globs=receipt_globs,
         explicit_protected_cascade_ids=protected,
     )
+
+
+def _canonical_digest(payload: dict[str, Any], algorithm: str) -> str:
+    canonical = json.dumps(
+        payload,
+        sort_keys=True,
+        separators=(",", ":"),
+        ensure_ascii=False,
+    ).encode("utf-8")
+    return hashlib.new(algorithm, canonical).hexdigest()
+
+
+def build_handover_acknowledgement(
+    policy: Policy,
+    *,
+    cascade_id: str,
+    source_trajectory_id: str,
+    successor_trajectory_id: str,
+    observed_step_count: int,
+    work_order_sha256: str,
+) -> dict[str, Any]:
+    """Create a deterministic acknowledgement bound to one handover snapshot."""
+    payload = {
+        "schema_version": policy.handover_ack_schema_version,
+        "cascade_id": str(cascade_id).strip().lower(),
+        "source_trajectory_id": str(source_trajectory_id).strip().lower(),
+        "successor_trajectory_id": str(successor_trajectory_id).strip().lower(),
+        "observed_step_count": int(observed_step_count),
+        "work_order_sha256": str(work_order_sha256).strip().lower(),
+    }
+    for field_name in (
+        "cascade_id",
+        "source_trajectory_id",
+        "successor_trajectory_id",
+    ):
+        if not _is_uuid(payload[field_name]):
+            raise ScannerError(f"handover acknowledgement has invalid {field_name}")
+    if not re.fullmatch(r"[0-9a-f]{64}", payload["work_order_sha256"]):
+        raise ScannerError("handover acknowledgement has invalid work_order_sha256")
+    if payload["observed_step_count"] < policy.handover_required_steps:
+        raise ScannerError("handover acknowledgement predates the required threshold")
+    return {
+        **payload,
+        "hash_algorithm": policy.handover_hash_algorithm,
+        "acknowledgement_sha256": _canonical_digest(
+            payload, policy.handover_hash_algorithm
+        ),
+    }
+
+
+def validate_handover_acknowledgement(
+    policy: Policy,
+    acknowledgement: Any,
+    *,
+    cascade_id: str,
+    source_trajectory_id: str,
+    successor_trajectory_id: str,
+    observed_step_count: int,
+    work_order_sha256: str,
+) -> list[str]:
+    """Return fail-closed acknowledgement issues; an empty list means valid."""
+    if not isinstance(acknowledgement, dict):
+        return ["handover_acknowledgement_missing"]
+    expected = {
+        "schema_version": policy.handover_ack_schema_version,
+        "cascade_id": str(cascade_id).strip().lower(),
+        "source_trajectory_id": str(source_trajectory_id).strip().lower(),
+        "successor_trajectory_id": str(successor_trajectory_id).strip().lower(),
+        "observed_step_count": int(observed_step_count),
+        "work_order_sha256": str(work_order_sha256).strip().lower(),
+    }
+    issues = [
+        f"handover_acknowledgement_mismatch:{field}"
+        for field, value in expected.items()
+        if acknowledgement.get(field) != value
+    ]
+    if acknowledgement.get("hash_algorithm") != policy.handover_hash_algorithm:
+        issues.append("handover_acknowledgement_mismatch:hash_algorithm")
+    supplied = str(acknowledgement.get("acknowledgement_sha256", "")).lower()
+    wanted = _canonical_digest(expected, policy.handover_hash_algorithm)
+    if not supplied or not hmac.compare_digest(supplied, wanted):
+        issues.append("handover_acknowledgement_hash_invalid")
+    return issues
+
+
+def evaluate_handover_gate(
+    policy: Policy,
+    *,
+    step_count: int,
+    action: str,
+    acknowledgement: Any = None,
+    cascade_id: str | None = None,
+    source_trajectory_id: str | None = None,
+    successor_trajectory_id: str | None = None,
+    work_order_sha256: str | None = None,
+) -> dict[str, Any]:
+    """Authorize lifecycle actions without embedding a threshold in code."""
+    normalized_action = str(action).strip().lower()
+    if int(step_count) < policy.handover_required_steps:
+        return {"allowed": True, "state": "NORMAL", "issues": []}
+    if normalized_action in policy.handover_allowed_actions:
+        return {"allowed": True, "state": "HANDOVER_REQUIRED", "issues": []}
+    if not all(
+        (cascade_id, source_trajectory_id, successor_trajectory_id, work_order_sha256)
+    ):
+        return {
+            "allowed": False,
+            "state": "HANDOVER_REQUIRED",
+            "issues": ["hash_bound_handover_acknowledgement_required"],
+        }
+    issues = validate_handover_acknowledgement(
+        policy,
+        acknowledgement,
+        cascade_id=str(cascade_id),
+        source_trajectory_id=str(source_trajectory_id),
+        successor_trajectory_id=str(successor_trajectory_id),
+        observed_step_count=int(step_count),
+        work_order_sha256=str(work_order_sha256),
+    )
+    return {
+        "allowed": not issues,
+        "state": "HANDOVER_ACKNOWLEDGED" if not issues else "HANDOVER_REQUIRED",
+        "issues": issues,
+    }
 
 
 def _run_task_manager(task_manager: Path) -> list[dict[str, Any]]:
@@ -526,7 +690,7 @@ def classify_records(
         if is_policy_protected:
             blockers.append("explicit protection")
         if requires_handover:
-            blockers.append("handover acknowledgement not implemented")
+            blockers.append("hash-bound handover acknowledgement required")
         if record.health != "OK":
             blockers.append(f"store health is {record.health}")
         if not evidence_present:
