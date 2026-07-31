@@ -45,8 +45,10 @@ python content-planner-kb/scripts/fb_refresh.py \
 The command reads Facebook analytics and writes only:
 `content-planner-kb/output/analytics/fb_<channel>_<YYYYMMDD>.json`.
 
-Do not add `--update-scorecards` unless the user explicitly requests local
-scorecard updates. Do not add `--sync-flags` and do not run
+Do not add `--skip-scorecards` unless the user explicitly requests raw-data-only
+collection without scorecard updates. By default, `fb_refresh.py` updates the
+ranking table (Section 1) of each channel's `performance-scorecard.md` while
+preserving curated sections (2-4). Do not add `--sync-flags` and do not run
 `fb_sync_topics.py`; those mutate local tracking state and are separate tasks.
 
 ## Completion evidence
