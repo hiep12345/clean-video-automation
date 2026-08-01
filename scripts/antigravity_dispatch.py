@@ -52,6 +52,7 @@ class DispatchSpec:
     workspace_root: Path
     work_order_sha256: str
     claim_allowed_state: str
+    profile_uri: str = ""
 
 
 @dataclass(frozen=True)
@@ -108,10 +109,56 @@ def _single_line(value: str, label: str) -> str:
     return text
 
 
+def _quote_windows_batch_argument(value: str) -> str:
+    """Quote one controlled AgentAPI argument for cmd.exe.
+
+    Batch files are interpreted by ``cmd.exe`` rather than the C runtime.  We
+    therefore use cmd's simple double-quoted argument form only after rejecting
+    its metacharacters.  The profile URI may contain URL escapes such as
+    ``%20``; paired percent expansions are rejected, while ordinary URL escapes
+    remain intact.
+    """
+    text = str(value)
+    if any(character in text for character in '"&|<>()^!'):
+        raise DispatchError("unsafe character in Windows batch argument")
+    if re.search(r"%[^%]+%", text):
+        raise DispatchError("unsafe environment expansion in Windows batch argument")
+    if "\n" in text or "\r" in text:
+        raise DispatchError("Windows batch argument must be one line")
+    return f'"{text}"'
+
+
+def resolve_profile_uri(value: str, workspace_root: Path) -> str:
+    """Return a canonical managed agent-profile URI or fail closed.
+
+    A dispatcher may select any workspace agent profile, but it must never
+    accept an arbitrary local file or a profile outside the workspace.  This
+    keeps the AgentAPI ``--profile`` argument generic without turning it into
+    a path-injection escape hatch.
+    """
+    raw = _single_line(value, "profile URI")
+    parsed = urlparse(raw)
+    if parsed.scheme.casefold() != "file" or parsed.netloc:
+        raise DispatchError("profile URI must be a local file URI")
+    path_text = unquote(parsed.path)
+    if re.fullmatch(r"/[A-Za-z]:/.*", path_text):
+        path_text = path_text[1:]
+    profile_path = Path(path_text).resolve()
+    profiles_root = (workspace_root / ".agents" / "agents").resolve()
+    try:
+        profile_path.relative_to(profiles_root)
+    except ValueError as exc:
+        raise DispatchError("profile URI must be under .agents/agents") from exc
+    if profile_path.parent != profiles_root or not (profile_path / "agent.md").is_file():
+        raise DispatchError("profile URI must name a managed agent profile")
+    return profile_path.as_uri()
+
+
 def build_bootstrap(spec: DispatchSpec) -> str:
     prompt = (
         f"Load Task Tracker task {spec.task_id} as role {spec.role} for project "
-        f"{spec.project_id}; expected trajectory {spec.trajectory_id}; work-order "
+        f"{spec.project_id}; profile {spec.profile_uri}; expected trajectory "
+        f"{spec.trajectory_id}; work-order "
         f"sha256 {spec.work_order_sha256}; do not claim or execute; first verify "
         "workspace/project/task evidence and acknowledge the dispatch handshake."
     )
@@ -159,7 +206,7 @@ def parse_conversation_id(output: str) -> str:
 
 
 def _run_process(
-    command: list[str],
+    command: list[str] | str,
     *,
     env: Mapping[str, str] | None = None,
 ) -> subprocess.CompletedProcess[str]:
@@ -171,6 +218,7 @@ def _run_process(
         encoding="utf-8",
         errors="replace",
         env=dict(env) if env is not None else None,
+        shell=isinstance(command, str),
     )
 
 
@@ -402,7 +450,16 @@ class AgentApiClient:
     def _command(self, *args: str, project_id: str | None = None) -> str:
         executable = self.runtime.executable
         if executable.suffix.casefold() in {".bat", ".cmd"}:
-            command = ["cmd.exe", "/d", "/s", "/c", str(executable), *args]
+            # ``subprocess`` cannot pass a space-containing batch-file path
+            # as an argv array: cmd.exe then splits the executable before the
+            # batch parser receives it.  Send one cmd.exe command line instead.
+            # AgentAPI arguments are machine-built and quoted with cmd.exe
+            # rules; unsafe shell metacharacters fail closed before execution.
+            batch_arguments = [str(executable), *args]
+            command = " ".join(
+                _quote_windows_batch_argument(value)
+                for value in batch_arguments
+            )
         else:
             command = [str(executable), *args]
         env = dict(os.environ)
@@ -415,11 +472,19 @@ class AgentApiClient:
             raise DispatchError(f"agentapi command failed: {args[0]}")
         return result.stdout
 
-    def new_conversation(self, prompt: str, *, project_id: str, title: str) -> str:
+    def new_conversation(
+        self,
+        prompt: str,
+        *,
+        project_id: str,
+        profile_uri: str,
+        title: str,
+    ) -> str:
         output = self._command(
             "new-conversation",
             "--model=pro",
             f"--title={_single_line(title, 'conversation title')}",
+            f"--profile={_single_line(profile_uri, 'profile URI')}",
             _single_line(prompt, "bootstrap prompt"),
             project_id=project_id,
         )
@@ -674,6 +739,12 @@ def verify_metadata(
     }
     if expected_workspace not in workspaces:
         raise DispatchError("conversation metadata workspace mismatch")
+    profiles = {
+        _normalize_workspace(value)
+        for value in _metadata_values(metadata, {"activeprofile"})
+    }
+    if _normalize_workspace(spec.profile_uri) not in profiles:
+        raise DispatchError("conversation metadata profile mismatch")
 
 
 def prepare_dispatch(
@@ -692,6 +763,8 @@ def prepare_dispatch(
         )
     if not SHA256_RE.fullmatch(spec.work_order_sha256):
         raise DispatchError("work-order SHA-256 is invalid")
+    if not spec.profile_uri:
+        raise DispatchError("profile URI is required for dispatch")
     if not UUID_RE.fullmatch(spec.trajectory_id):
         raise DispatchError("expected trajectory ID is invalid")
     if not UUID_RE.fullmatch(authority.trajectory_id):
@@ -710,6 +783,7 @@ def prepare_dispatch(
         conversation_id = agentapi.new_conversation(
             bootstrap,
             project_id=spec.project_id,
+            profile_uri=spec.profile_uri,
             title=f"dispatch-{spec.task_id}",
         )
         phase = "agentapi_metadata"
@@ -798,6 +872,7 @@ def build_parser() -> argparse.ArgumentParser:
         command.add_argument("--role", required=True)
         command.add_argument("--trajectory", required=True)
         command.add_argument("--project-id", required=True)
+        command.add_argument("--profile", required=True)
         command.add_argument("--workspace-root", required=True, type=Path)
         command.add_argument("--work-order", required=True, type=Path)
         command.add_argument("--task-manager", required=True, type=Path)
@@ -823,6 +898,7 @@ def _spec_from_args(args: argparse.Namespace) -> DispatchSpec:
         role=_single_line(args.role, "role"),
         trajectory_id=_single_line(args.trajectory, "trajectory"),
         project_id=_single_line(args.project_id, "project id"),
+        profile_uri=resolve_profile_uri(args.profile, workspace_root),
         workspace_root=workspace_root,
         work_order_sha256=sha256_file(work_order),
         claim_allowed_state=load_claim_allowed_state(workspace_root),

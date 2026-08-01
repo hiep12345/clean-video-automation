@@ -52,6 +52,7 @@ EXPECTED_TOOLS = {
         "multi_replace_file_content",
         "run_command",
     },
+    "video-pipeline-operator": {"view_file"},
     "web-developer": {
         "view_file",
         "grep_search",
@@ -218,6 +219,22 @@ class AgentDefinitionTests(unittest.TestCase):
             "record the exact source URL/DOI",
             texts["qa-reviewer"],
         )
+
+    def test_video_pipeline_operator_is_a_delegating_control_plane(self):
+        """The generic operator may not silently become production or QA."""
+        operator = (AGENT_DIR / "video-pipeline-operator" / "agent.md").read_text(
+            encoding="utf-8"
+        )
+        routing = ROUTING_FILE.read_text(encoding="utf-8")
+        manifest = (ROOT / ".agents" / "config" / "team-manifest.yaml").read_text(
+            encoding="utf-8"
+        )
+        self.assertIn("control-plane agent", operator)
+        self.assertRegex(operator, r"does\s+not generate media")
+        self.assertIn("`production-executor`", operator)
+        self.assertIn("`qa-reviewer`", operator)
+        self.assertIn("`video-pipeline-operator`", routing)
+        self.assertIn('"video-pipeline-operator"', manifest)
 
     def test_required_static_references_exist(self):
         """Canonical scripts, policies and skills used by agents must exist."""

@@ -78,6 +78,14 @@
       "handed_to": "repository-integrator",
       "git_authority": "none"
     },
+    "video-pipeline-operator": {
+      "risk_tier": 1,
+      "write_scope_required": false,
+      "independent_trajectory": false,
+      "handed_to": "production-executor",
+      "verified_by": "qa-reviewer",
+      "git_authority": "none"
+    },
     "web-developer": {
       "risk_tier": 3,
       "write_scope_required": true,

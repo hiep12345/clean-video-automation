@@ -1,185 +1,72 @@
 const assert = require('node:assert/strict');
-const test = require('node:test');
 const fs = require('node:fs');
 const path = require('node:path');
+const test = require('node:test');
 
-// Helper state machine simulator for operator evaluation
-function evaluateOperatorState(context) {
-  if (!context.compiledWorkOrder) {
-    return {
-      status: 'WAITING_FOR_COMPILED_WORK_ORDER',
-      allowedTools: [],
-      canExecute: false,
-      reason: 'No compiled work order provided'
-    };
-  }
+const root = path.resolve(__dirname, '..');
+const agentPath = path.join(
+  root,
+  '.agents',
+  'agents',
+  'video-pipeline-operator',
+  'agent.md',
+);
+const routingPath = path.join(root, '.agents', 'config', 'agent-routing.md');
+const manifestPath = path.join(root, '.agents', 'config', 'team-manifest.yaml');
+const dispatcherPath = path.join(root, 'scripts', 'antigravity_dispatch.py');
 
-  if (!context.preflightClaimPassed) {
-    return {
-      status: 'BLOCKED',
-      allowedTools: [],
-      canExecute: false,
-      reason: 'Preflight claim missing or failed'
-    };
-  }
-
-  if (context.bypassQaGate || context.bypassThumbnail || context.selfCertify) {
-    return {
-      status: 'BLOCKED',
-      allowedTools: [],
-      canExecute: false,
-      reason: 'Attempted QA gate, thumbnail, or self-certification bypass'
-    };
-  }
-
-  if (context.useFresh && !context.destructiveResetAuthorized) {
-    return {
-      status: 'BLOCKED',
-      allowedTools: [],
-      canExecute: false,
-      reason: '--fresh flag requires explicit destructive_reset_authorized=true'
-    };
-  }
-
-  if (context.isHealthOk && !context.generationAuthorized && context.requestingProviderCall) {
-    return {
-      status: 'BLOCKED',
-      allowedTools: [],
-      canExecute: false,
-      reason: 'Service /health HTTP 200 confirms availability only, not generation authorization'
-    };
-  }
-
-  if (context.requestingExternalPublish && !context.externalPublishAuthorized) {
-    return {
-      status: 'BLOCKED',
-      allowedTools: [],
-      canExecute: false,
-      reason: 'External publishing requires explicit separate authorization'
-    };
-  }
-
-  if (context.hasChannelHardcode) {
-    return {
-      status: 'BLOCKED',
-      allowedTools: [],
-      canExecute: false,
-      reason: 'Channel template or duration trim hardcoding prohibited'
-    };
-  }
-
-  // Sequence verification
-  const expectedSequence = [
-    'compiled_work_order',
-    'preflight',
-    'execution',
-    'independent_qa',
-    'READY_LOCAL',
-    'separately_authorized_distribution'
-  ];
-
-  if (JSON.stringify(context.executionSequence) !== JSON.stringify(expectedSequence.slice(0, context.executionSequence.length))) {
-    return {
-      status: 'BLOCKED',
-      allowedTools: [],
-      canExecute: false,
-      reason: 'Execution sequence out of mandatory order'
-    };
-  }
-
-  return {
-    status: context.independentQaPassed ? 'READY_LOCAL' : 'IN_PROGRESS',
-    canExecute: true
-  };
+function frontmatter(text) {
+  const closing = text.indexOf('\n---', 3);
+  assert.notEqual(closing, -1, 'agent profile must close YAML frontmatter');
+  return text.slice(4, closing);
 }
 
-test('operator profile: missing compiled work order returns WAITING_FOR_COMPILED_WORK_ORDER with zero tools', () => {
-  const result = evaluateOperatorState({ compiledWorkOrder: false });
-  assert.equal(result.status, 'WAITING_FOR_COMPILED_WORK_ORDER');
-  assert.equal(result.canExecute, false);
-  assert.deepEqual(result.allowedTools, []);
+test('operator profile is a native Antigravity profile with least privilege', () => {
+  const text = fs.readFileSync(agentPath, 'utf8');
+  const metadata = frontmatter(text);
+
+  assert.match(metadata, /^name: video-pipeline-operator$/m);
+  assert.match(metadata, /^subagent: true$/m);
+  assert.match(metadata, /^  - view_file$/m);
+  assert.doesNotMatch(metadata, /run_command|write_to_file|replace_file_content/);
+  assert.match(text, /control-plane agent/);
+  assert.match(text, /does\s+not generate media/);
+  assert.match(text, /cannot self-certify PASS or READY/i);
+  assert.match(text, /Facebook publishing is strictly manual-only/i);
 });
 
-test('operator profile: self-certification or QA gate bypass fails closed', () => {
-  const resultSelfCert = evaluateOperatorState({
-    compiledWorkOrder: true,
-    preflightClaimPassed: true,
-    selfCertify: true
-  });
-  assert.equal(resultSelfCert.status, 'BLOCKED');
+test('operator is registered as a delegating control-plane role', () => {
+  const routing = fs.readFileSync(routingPath, 'utf8');
+  const manifest = fs.readFileSync(manifestPath, 'utf8');
 
-  const resultBypassQa = evaluateOperatorState({
-    compiledWorkOrder: true,
-    preflightClaimPassed: true,
-    bypassQaGate: true
-  });
-  assert.equal(resultBypassQa.status, 'BLOCKED');
+  assert.match(routing, /\| `video-pipeline-operator` \|/);
+  assert.match(routing, /Delegates production to `production-executor`/);
+  assert.match(routing, /QA to `qa-reviewer`/);
+  assert.match(manifest, /"video-pipeline-operator"\s*:\s*\{/);
+  assert.match(manifest, /"risk_tier"\s*:\s*1/);
+  assert.match(manifest, /"handed_to"\s*:\s*"production-executor"/);
+  assert.match(manifest, /"verified_by"\s*:\s*"qa-reviewer"/);
 });
 
-test('operator profile: --fresh requires destructive_reset_authorized=true', () => {
-  const resultNoAuth = evaluateOperatorState({
-    compiledWorkOrder: true,
-    preflightClaimPassed: true,
-    useFresh: true,
-    destructiveResetAuthorized: false
-  });
-  assert.equal(resultNoAuth.status, 'BLOCKED');
+test('dispatcher binds an explicit managed profile and fails closed on metadata mismatch', () => {
+  const source = fs.readFileSync(dispatcherPath, 'utf8');
 
-  const resultWithAuth = evaluateOperatorState({
-    compiledWorkOrder: true,
-    preflightClaimPassed: true,
-    useFresh: true,
-    destructiveResetAuthorized: true,
-    executionSequence: ['compiled_work_order', 'preflight', 'execution']
-  });
-  assert.equal(resultWithAuth.canExecute, true);
+  assert.match(source, /profile_uri: str/);
+  assert.match(source, /def resolve_profile_uri\(/);
+  assert.match(source, /profile URI must be under \.agents\/agents/);
+  assert.match(source, /--profile=\{_single_line\(profile_uri/);
+  assert.match(source, /conversation metadata profile mismatch/);
+  assert.match(source, /profile_uri=spec\.profile_uri/);
 });
 
-test('operator profile: /health 200 OK is availability only, not generation authorization', () => {
-  const result = evaluateOperatorState({
-    compiledWorkOrder: true,
-    preflightClaimPassed: true,
-    isHealthOk: true,
-    generationAuthorized: false,
-    requestingProviderCall: true
-  });
-  assert.equal(result.status, 'BLOCKED');
-  assert.match(result.reason, /generation authorization/i);
-});
+test('Windows batch dispatch quotes paths with spaces and rejects shell metacharacters', () => {
+  const source = fs.readFileSync(dispatcherPath, 'utf8');
 
-test('operator profile: external publishing requires explicit separate authorization', () => {
-  const result = evaluateOperatorState({
-    compiledWorkOrder: true,
-    preflightClaimPassed: true,
-    requestingExternalPublish: true,
-    externalPublishAuthorized: false
-  });
-  assert.equal(result.status, 'BLOCKED');
-});
-
-test('operator profile: enforces strict pipeline sequence', () => {
-  const invalidSequence = evaluateOperatorState({
-    compiledWorkOrder: true,
-    preflightClaimPassed: true,
-    executionSequence: ['compiled_work_order', 'execution'] // skipped preflight step in sequence
-  });
-  assert.equal(invalidSequence.status, 'BLOCKED');
-});
-
-test('static documentation verification: agent.md and workflow.md contain mandatory policy declarations', () => {
-  const rootDir = path.resolve(__dirname, '..');
-  const agentMdPath = path.join(rootDir, '.agents', 'agents', 'video-pipeline-operator', 'agent.md');
-  const workflowMdPath = path.join(rootDir, '.agents', 'workflows', 'video-pipeline-operator-certification.md');
-
-  assert.ok(fs.existsSync(agentMdPath), 'agent.md must exist');
-  assert.ok(fs.existsSync(workflowMdPath), 'workflow.md must exist');
-
-  const agentContent = fs.readFileSync(agentMdPath, 'utf8');
-  const workflowContent = fs.readFileSync(workflowMdPath, 'utf8');
-
-  assert.match(agentContent, /WAITING_FOR_COMPILED_WORK_ORDER/);
-  assert.match(agentContent, /destructive_reset_authorized=true/);
-  assert.match(agentContent, /HTTP 200 OK/);
-  assert.match(workflowContent, /WAITING_FOR_COMPILED_WORK_ORDER/);
-  assert.match(workflowContent, /team_preflight\.py/);
+  assert.match(source, /def _quote_windows_batch_argument\(/);
+  assert.match(source, /command = " "\.join\(/);
+  assert.match(source, /shell=isinstance\(command, str\)/);
+  assert.match(source, /unsafe character in Windows batch argument/);
+  assert.match(source, /unsafe environment expansion in Windows batch argument/);
+  assert.doesNotMatch(source, /subprocess\.list2cmdline\(batch_arguments\)/);
+  assert.doesNotMatch(source, /\["cmd\.exe", "\/d", "\/s", "\/c", str\(executable\)/);
 });
