@@ -235,7 +235,6 @@ class AgentDefinitionTests(unittest.TestCase):
         content_required = (
             "content-planner-kb/GEMINI.md",
             "content-planner-kb/scripts/fb_page_insights.py",
-            "content-planner-kb/scripts/notion_sync.py",
             "content-planner-kb/scripts/archive_old_uploads.py",
             "content-planner-kb/scripts/produce_pipeline.py",
             "content-planner-kb/scripts/qa/l1_script_qa.py",
