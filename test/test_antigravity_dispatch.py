@@ -1,4 +1,5 @@
 import json
+import os
 import sqlite3
 import subprocess
 import sys
@@ -93,7 +94,7 @@ class FakeGateway:
 
 
 class FakeAgentApi:
-    def __init__(self, workspace, *, project_id="project-one"):
+    def __init__(self, workspace, *, project_id="project-one", profile_uri=""):
         self.new_calls = []
         self.metadata_calls = []
         self.messages = []
@@ -101,10 +102,11 @@ class FakeAgentApi:
             "conversationId": CONVERSATION,
             "projectId": project_id,
             "workspaceUri": workspace.as_uri(),
+            "activeProfile": profile_uri,
         }
 
-    def new_conversation(self, prompt, *, project_id, title):
-        self.new_calls.append((prompt, project_id, title))
+    def new_conversation(self, prompt, *, project_id, profile_uri, title):
+        self.new_calls.append((prompt, project_id, profile_uri, title))
         return CONVERSATION
 
     def get_metadata(self, conversation_id):
@@ -119,11 +121,13 @@ class DispatcherTests(unittest.TestCase):
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory()
         self.workspace = Path(self.temp.name).resolve()
+        self.profile_uri = (self.workspace / "profiles" / "operator").as_uri()
         self.spec = dispatch.DispatchSpec(
             task_id=TASK_ID,
             role=ROLE,
             trajectory_id=TRAJECTORY,
             project_id="project-one",
+            profile_uri=self.profile_uri,
             workspace_root=self.workspace,
             work_order_sha256=WORK_ORDER_SHA256,
             claim_allowed_state="ACKNOWLEDGED",
@@ -197,7 +201,7 @@ class DispatcherTests(unittest.TestCase):
 
     def test_prepare_uses_authority_contract_and_never_authorizes_claim(self):
         gateway = FakeGateway()
-        agentapi = FakeAgentApi(self.workspace)
+        agentapi = FakeAgentApi(self.workspace, profile_uri=self.profile_uri)
 
         result = self.prepare(gateway, agentapi)
 
@@ -210,12 +214,17 @@ class DispatcherTests(unittest.TestCase):
             [(self.spec, self.authority, CONVERSATION)],
         )
         self.assertEqual(len(agentapi.messages), 1)
+        self.assertEqual(agentapi.new_calls[0][2], self.profile_uri)
         self.assertIn(ACK_TOKEN, agentapi.messages[0][1])
         self.assertNotIn(ACK_TOKEN, json.dumps(result))
 
     def test_metadata_mismatch_aborts_prepared_state_before_retry(self):
         gateway = FakeGateway()
-        agentapi = FakeAgentApi(self.workspace, project_id="wrong-project")
+        agentapi = FakeAgentApi(
+            self.workspace,
+            project_id="wrong-project",
+            profile_uri=self.profile_uri,
+        )
 
         with self.assertRaisesRegex(dispatch.DispatchError, "project mismatch"):
             self.prepare(gateway, agentapi)
@@ -235,9 +244,70 @@ class DispatcherTests(unittest.TestCase):
             ],
         )
 
+    def test_profile_metadata_mismatch_aborts_prepared_state_before_retry(self):
+        gateway = FakeGateway()
+        agentapi = FakeAgentApi(
+            self.workspace,
+            profile_uri=(self.workspace / "profiles" / "wrong").as_uri(),
+        )
+
+        with self.assertRaisesRegex(dispatch.DispatchError, "profile mismatch"):
+            self.prepare(gateway, agentapi)
+
+        self.assertEqual(
+            gateway.abort_calls,
+            [
+                (
+                    self.spec,
+                    self.authority,
+                    "agentapi_metadata_failed",
+                    CONVERSATION,
+                )
+            ],
+        )
+
+    def test_metadata_accepts_canonical_project_path_when_agentapi_omits_workspace(self):
+        spec = dispatch.DispatchSpec(
+            task_id=TASK_ID,
+            role=ROLE,
+            trajectory_id=TRAJECTORY,
+            project_id=str(self.workspace),
+            profile_uri=self.profile_uri,
+            workspace_root=self.workspace,
+            work_order_sha256=WORK_ORDER_SHA256,
+            claim_allowed_state="ACKNOWLEDGED",
+        )
+        agentapi = FakeAgentApi(
+            self.workspace,
+            project_id=str(self.workspace),
+            profile_uri=self.profile_uri,
+        )
+        agentapi.metadata.pop("workspaceUri")
+
+        dispatch.verify_metadata(agentapi.metadata, spec, CONVERSATION)
+
+    def test_metadata_rejects_opaque_project_id_when_workspace_is_missing(self):
+        agentapi = FakeAgentApi(
+            self.workspace, profile_uri=self.profile_uri
+        )
+        agentapi.metadata.pop("workspaceUri")
+
+        with self.assertRaisesRegex(dispatch.DispatchError, "workspace mismatch"):
+            dispatch.verify_metadata(agentapi.metadata, self.spec, CONVERSATION)
+
+    def test_metadata_accepts_agentapi_root_conversation_id(self):
+        agentapi = FakeAgentApi(
+            self.workspace, profile_uri=self.profile_uri
+        )
+        agentapi.metadata["rootConversationId"] = agentapi.metadata.pop(
+            "conversationId"
+        )
+
+        dispatch.verify_metadata(agentapi.metadata, self.spec, CONVERSATION)
+
     def test_agentapi_failure_aborts_prepared_attempt_for_safe_retry(self):
         gateway = FakeGateway()
-        agentapi = FakeAgentApi(self.workspace)
+        agentapi = FakeAgentApi(self.workspace, profile_uri=self.profile_uri)
 
         def fail_new_conversation(*args, **kwargs):
             raise dispatch.DispatchError("agentapi unavailable")
@@ -267,7 +337,9 @@ class DispatcherTests(unittest.TestCase):
         ):
             with self.subTest(gate=gate):
                 gateway = FakeGateway()
-                agentapi = FakeAgentApi(self.workspace)
+                agentapi = FakeAgentApi(
+                    self.workspace, profile_uri=self.profile_uri
+                )
                 with self.assertRaisesRegex(
                     dispatch.DispatchError, "lifecycle blocked"
                 ):
@@ -277,7 +349,7 @@ class DispatcherTests(unittest.TestCase):
 
     def test_local_identity_must_match_authenticated_authority_trajectory(self):
         gateway = FakeGateway()
-        agentapi = FakeAgentApi(self.workspace)
+        agentapi = FakeAgentApi(self.workspace, profile_uri=self.profile_uri)
         mismatched = dispatch.LocalConversationIdentity(
             cascade_id=SOURCE_CASCADE,
             trajectory_id=SOURCE_TRAJECTORY,
@@ -344,6 +416,38 @@ class DispatcherTests(unittest.TestCase):
         self.assertEqual(runtime.address, "https://127.0.0.1:6200")
         self.assertEqual(runtime.csrf_token, "process-token")
         self.assertNotIn("process-token", repr(runtime))
+
+    @unittest.skipUnless(os.name == "nt", "Windows batch quoting only")
+    def test_agentapi_batch_command_preserves_paths_and_arguments_with_spaces(self):
+        executable = self.workspace / "agent api.bat"
+        executable.write_text("@echo off\necho %~1^|%~2\n", encoding="utf-8")
+        runtime = dispatch.AgentApiRuntime(
+            executable=executable,
+            pid=1,
+            port=6200,
+            address="https://127.0.0.1:6200",
+            csrf_token="test-token",
+        )
+
+        output = dispatch.AgentApiClient(runtime)._command(
+            "file:///C:/Profile%20Folder", "second argument"
+        )
+
+        self.assertEqual(
+            output.strip(), "file:///C:/Profile%20Folder|second argument"
+        )
+
+    def test_agentapi_batch_command_rejects_shell_metacharacters(self):
+        runtime = dispatch.AgentApiRuntime(
+            executable=self.workspace / "agentapi.bat",
+            pid=1,
+            port=6200,
+            address="https://127.0.0.1:6200",
+            csrf_token="test-token",
+        )
+
+        with self.assertRaisesRegex(dispatch.DispatchError, "unsafe character"):
+            dispatch.AgentApiClient(runtime)._command("bad&argument")
 
     def test_runtime_discovery_fails_closed_on_multiple_endpoints(self):
         executable = self.workspace / "agentapi.bat"

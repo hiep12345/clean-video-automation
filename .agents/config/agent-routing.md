@@ -11,6 +11,7 @@ assigns one primary agent per task and declares a non-overlapping write scope.
 | `qa-reviewer` | L1/L2/L3 content-media QA | `content-planner-kb` | Approved QA report only | Cannot regenerate or publish |
 | `script-writer` | Script, prompts and metadata | `content-planner-kb` | One designated `script.md` | Cannot publish or invent unsupported facts |
 | `system-developer` | Backend/API/database changes | Explicit task repository | Declared source and tests | External services and production data require approval |
+| `video-pipeline-operator` | Contract-bound video pipeline control plane | Workspace root | Declared work-order and handoff evidence only | Delegates production to `production-executor` and QA to `qa-reviewer`; cannot generate, self-certify, publish or mutate Git |
 | `web-developer` | UI/dashboard changes | Explicit task repository | Declared UI folder and tests | Package changes and deployment require approval |
 | `repository-integrator` | Git review and closeout | Explicit task repository | Exact tracker `git_write_scope` only | Feature-branch commit/push only; cannot merge or edit source |
 
