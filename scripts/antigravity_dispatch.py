@@ -718,7 +718,13 @@ def verify_metadata(
     conversations = {
         value.lower()
         for value in _metadata_values(
-            metadata, {"conversationid", "cascadeid", "conversationuuid"}
+            metadata,
+            {
+                "conversationid",
+                "cascadeid",
+                "conversationuuid",
+                "rootconversationid",
+            },
         )
         if UUID_RE.fullmatch(value)
     }
@@ -738,7 +744,19 @@ def verify_metadata(
         )
     }
     if expected_workspace not in workspaces:
-        raise DispatchError("conversation metadata workspace mismatch")
+        # AgentAPI may omit workspaceUris even when it received the canonical
+        # local workspace path as projectId.  Accept that narrow representation
+        # only when both the requested and returned project IDs resolve to the
+        # exact workspace root; aliases and opaque project IDs remain blocked.
+        requested_project = _normalize_workspace(spec.project_id)
+        returned_projects = {
+            _normalize_workspace(value) for value in projects
+        }
+        if (
+            requested_project != expected_workspace
+            or expected_workspace not in returned_projects
+        ):
+            raise DispatchError("conversation metadata workspace mismatch")
     profiles = {
         _normalize_workspace(value)
         for value in _metadata_values(metadata, {"activeprofile"})

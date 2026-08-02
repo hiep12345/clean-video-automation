@@ -266,6 +266,45 @@ class DispatcherTests(unittest.TestCase):
             ],
         )
 
+    def test_metadata_accepts_canonical_project_path_when_agentapi_omits_workspace(self):
+        spec = dispatch.DispatchSpec(
+            task_id=TASK_ID,
+            role=ROLE,
+            trajectory_id=TRAJECTORY,
+            project_id=str(self.workspace),
+            profile_uri=self.profile_uri,
+            workspace_root=self.workspace,
+            work_order_sha256=WORK_ORDER_SHA256,
+            claim_allowed_state="ACKNOWLEDGED",
+        )
+        agentapi = FakeAgentApi(
+            self.workspace,
+            project_id=str(self.workspace),
+            profile_uri=self.profile_uri,
+        )
+        agentapi.metadata.pop("workspaceUri")
+
+        dispatch.verify_metadata(agentapi.metadata, spec, CONVERSATION)
+
+    def test_metadata_rejects_opaque_project_id_when_workspace_is_missing(self):
+        agentapi = FakeAgentApi(
+            self.workspace, profile_uri=self.profile_uri
+        )
+        agentapi.metadata.pop("workspaceUri")
+
+        with self.assertRaisesRegex(dispatch.DispatchError, "workspace mismatch"):
+            dispatch.verify_metadata(agentapi.metadata, self.spec, CONVERSATION)
+
+    def test_metadata_accepts_agentapi_root_conversation_id(self):
+        agentapi = FakeAgentApi(
+            self.workspace, profile_uri=self.profile_uri
+        )
+        agentapi.metadata["rootConversationId"] = agentapi.metadata.pop(
+            "conversationId"
+        )
+
+        dispatch.verify_metadata(agentapi.metadata, self.spec, CONVERSATION)
+
     def test_agentapi_failure_aborts_prepared_attempt_for_safe_retry(self):
         gateway = FakeGateway()
         agentapi = FakeAgentApi(self.workspace, profile_uri=self.profile_uri)
